@@ -1,0 +1,70 @@
+﻿export const CONSTELLATION_LORE_REGISTRY = [
+  {
+    id: "great-bear-01",
+
+    targetStarIds: [
+      "dubhe",
+      "merak",
+      "phecda",
+      "megrez",
+      "alioth",
+      "mizar",
+      "alkaid"
+    ],
+
+    presentationLayout: [
+      { id: "dubhe",  x: -0.82, y:  0.42 },
+      { id: "merak",  x: -0.82, y: -0.18 },
+      { id: "phecda", x: -0.34, y: -0.16 },
+      { id: "megrez", x: -0.06, y:  0.02 },
+      { id: "alioth", x:  0.30, y:  0.06 },
+      { id: "mizar",  x:  0.62, y:  0.04 },
+      { id: "alkaid", x:  0.96, y:  0.22 }
+    ],
+
+    presentationEdges: [
+      ["dubhe", "merak"],
+      ["merak", "phecda"],
+      ["phecda", "megrez"],
+      ["megrez", "dubhe"],
+      ["megrez", "alioth"],
+      ["alioth", "mizar"],
+      ["mizar", "alkaid"]
+    ],
+
+    promptLabel: "Велика Ведмедиця",
+    promptReadyLabel: "E • відкрити сузір'я",
+
+    dwellMs: 900,
+    focusAngleDeg: 8.0,
+    focusReleaseDeg: 11.5,
+    promptLift: 0.28,
+
+    revealDistance: 3.55,
+    revealLift: 0.04,
+    revealSide: -0.48,
+    revealScale: 1.18,
+
+    overlayDistance: 3.05,
+    overlayLift: 0.12,
+    overlaySide: 0.78,
+
+    openDurationMs: 1700,
+    closeDurationMs: 1350,
+    panelDelayMs: 620,
+
+    title: "Ursa Major · Велика Ведмедиця",
+    body: [
+      "Велика Ведмедиця — одне з найупізнаваніших сузір’їв північного неба. У цьому світі вона працює не як схема з підручника, а як перший небесний архів.",
+      "Коли користувач утримує на ній увагу, небо відповідає не кнопкою, а актом наближення: сузір’я виходить у простір як окрема форма для споглядання.",
+      "Цей slice перевіряє правильну interaction grammar Whisper XR: gaze, attunement, confirmation, cinematic reveal, читання, return."
+    ],
+  },
+];
+
+export function getConstellationLoreEntry(id = "great-bear-01") {
+  return (
+    CONSTELLATION_LORE_REGISTRY.find((entry) => entry.id === id) ??
+    CONSTELLATION_LORE_REGISTRY[0]
+  );
+}

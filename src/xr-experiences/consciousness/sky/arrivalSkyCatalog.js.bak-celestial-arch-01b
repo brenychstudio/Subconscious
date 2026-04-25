@@ -1,0 +1,38 @@
+﻿export const ARRIVAL_HERO_STARS = [
+  { id: "polaris", ra: 2.5303, dec: 89.2641, mag: 1.98 },
+  { id: "vega", ra: 18.6156, dec: 38.7837, mag: 0.03 },
+  { id: "deneb", ra: 20.6905, dec: 45.2803, mag: 1.25 },
+  { id: "altair", ra: 19.8464, dec: 8.8683, mag: 0.76 },
+  { id: "betelgeuse", ra: 5.9195, dec: 7.4071, mag: 0.45 },
+  { id: "rigel", ra: 5.2423, dec: -8.2016, mag: 0.13 },
+  { id: "capella", ra: 5.2782, dec: 45.998, mag: 0.08 },
+  { id: "aldebaran", ra: 4.5987, dec: 16.5093, mag: 0.86 },
+  { id: "castor", ra: 7.5767, dec: 31.8883, mag: 1.58 },
+  { id: "pollux", ra: 7.7553, dec: 28.0262, mag: 1.14 },
+  { id: "sirius", ra: 6.7525, dec: -16.7161, mag: -1.46 },
+];
+
+export const ARRIVAL_CONSTELLATION_GROUPS = [
+  {
+    id: "summer-triangle",
+    stars: ["vega", "deneb", "altair"],
+    emphasis: 1,
+  },
+  {
+    id: "winter-axis",
+    stars: ["betelgeuse", "rigel", "aldebaran", "capella", "pollux", "castor", "sirius"],
+    emphasis: 0.72,
+  },
+];
+
+export const ARRIVAL_UPPER_SKY_BANDS = [
+  { id: "zenith", minY: 0.38, opacity: 1 },
+  { id: "upper-mid", minY: 0.12, opacity: 0.8 },
+  { id: "lower-fade", minY: -0.1, opacity: 0.3 },
+];
+
+export const ARRIVAL_SKY_DEBUG_INFO = {
+  version: "CELESTIAL-ARCH-01A",
+  mode: "foundation-only",
+  note: "No runtime integration yet. Renderer rewrite begins in 01B.",
+};

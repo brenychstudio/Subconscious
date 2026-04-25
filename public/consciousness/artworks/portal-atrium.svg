@@ -1,0 +1,15 @@
+﻿<svg width="1200" height="1600" viewBox="0 0 1200 1600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="1600" fill="#04060A"/>
+  <rect x="260" y="260" width="680" height="940" stroke="#DCE7FF" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="330" y="330" width="540" height="800" stroke="#9FBFFF" stroke-opacity="0.22" stroke-width="2"/>
+  <rect x="405" y="420" width="390" height="620" rx="190" fill="url(#g1)" fill-opacity="0.72"/>
+  <rect x="425" y="440" width="350" height="580" rx="175" stroke="#EFF5FF" stroke-opacity="0.25" stroke-width="2"/>
+  <text x="600" y="1360" text-anchor="middle" fill="#E6EEFF" fill-opacity="0.88" font-family="Arial, Helvetica, sans-serif" font-size="56" letter-spacing="10">PORTAL ATRIUM</text>
+  <defs>
+    <radialGradient id="g1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 730) rotate(90) scale(320 240)">
+      <stop stop-color="#EDF4FF"/>
+      <stop offset="0.45" stop-color="#9FBFFF" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#08101E" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>

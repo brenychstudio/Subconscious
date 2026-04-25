@@ -1,0 +1,8 @@
+﻿<svg width="1200" height="1600" viewBox="0 0 1200 1600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="1600" fill="#05070C"/>
+  <path d="M190 290C300 360 420 520 600 520C780 520 900 360 1010 290" stroke="#C7DAFF" stroke-opacity="0.18" stroke-width="2"/>
+  <path d="M150 520C300 660 420 740 600 740C780 740 900 660 1050 520" stroke="#9DBBFF" stroke-opacity="0.22" stroke-width="2"/>
+  <path d="M120 820C300 970 420 1050 600 1050C780 1050 900 970 1080 820" stroke="#E4EEFF" stroke-opacity="0.12" stroke-width="2"/>
+  <rect x="228" y="230" width="744" height="1140" stroke="#E4EEFF" stroke-opacity="0.12"/>
+  <text x="600" y="1360" text-anchor="middle" fill="#E6EEFF" fill-opacity="0.86" font-family="Arial, Helvetica, sans-serif" font-size="56" letter-spacing="10">SIGNAL CORRIDOR</text>
+</svg>

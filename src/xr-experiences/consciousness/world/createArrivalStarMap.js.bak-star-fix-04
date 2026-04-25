@@ -1,0 +1,325 @@
+﻿import * as THREE from "three";
+
+const STAR_DATA = [
+  { id: "polaris", ra: 2.5303, dec: 89.2641, mag: 1.98 },
+  { id: "caph", ra: 0.1529, dec: 59.1498, mag: 2.28 },
+  { id: "schedar", ra: 0.6751, dec: 56.5373, mag: 2.24 },
+  { id: "gamma-cas", ra: 0.9451, dec: 60.7167, mag: 2.15 },
+  { id: "ruchbah", ra: 1.4303, dec: 60.2353, mag: 2.68 },
+  { id: "segin", ra: 2.2939, dec: 63.67, mag: 3.35 },
+
+  { id: "capella", ra: 5.2782, dec: 45.998, mag: 0.08 },
+  { id: "aldebaran", ra: 4.5987, dec: 16.5093, mag: 0.86 },
+
+  { id: "betelgeuse", ra: 5.9195, dec: 7.4071, mag: 0.45 },
+  { id: "bellatrix", ra: 5.4189, dec: 6.3497, mag: 1.64 },
+  { id: "alnitak", ra: 5.6793, dec: -1.9426, mag: 1.74 },
+  { id: "alnilam", ra: 5.6036, dec: -1.2019, mag: 1.69 },
+  { id: "mintaka", ra: 5.5334, dec: -0.2991, mag: 2.23 },
+  { id: "saiph", ra: 5.7959, dec: -9.6696, mag: 2.07 },
+  { id: "rigel", ra: 5.2423, dec: -8.2016, mag: 0.13 },
+
+  { id: "castor", ra: 7.5767, dec: 31.8883, mag: 1.58 },
+  { id: "pollux", ra: 7.7553, dec: 28.0262, mag: 1.14 },
+  { id: "procyon", ra: 7.655, dec: 5.225, mag: 0.34 },
+  { id: "sirius", ra: 6.7525, dec: -16.7161, mag: -1.46 },
+
+  { id: "vega", ra: 18.6156, dec: 38.7837, mag: 0.03 },
+  { id: "deneb", ra: 20.6905, dec: 45.2803, mag: 1.25 },
+  { id: "altair", ra: 19.8464, dec: 8.8683, mag: 0.76 },
+
+  { id: "dubhe", ra: 11.0621, dec: 61.7508, mag: 1.79 },
+  { id: "merak", ra: 11.0307, dec: 56.3824, mag: 2.34 },
+  { id: "phecda", ra: 11.8972, dec: 53.6948, mag: 2.43 },
+  { id: "megrez", ra: 12.257, dec: 57.0326, mag: 3.32 },
+  { id: "alioth", ra: 12.9004, dec: 55.9598, mag: 1.76 },
+  { id: "mizar", ra: 13.3987, dec: 54.9254, mag: 2.23 },
+  { id: "alkaid", ra: 13.7923, dec: 49.3133, mag: 1.85 },
+];
+
+const SEGMENTS = [
+  ["caph", "schedar"], ["schedar", "gamma-cas"], ["gamma-cas", "ruchbah"], ["ruchbah", "segin"],
+  ["betelgeuse", "bellatrix"], ["bellatrix", "mintaka"], ["mintaka", "alnilam"], ["alnilam", "alnitak"],
+  ["alnitak", "saiph"], ["saiph", "rigel"], ["rigel", "mintaka"], ["betelgeuse", "alnitak"],
+  ["castor", "pollux"], ["pollux", "procyon"], ["procyon", "sirius"],
+  ["vega", "deneb"], ["deneb", "altair"], ["altair", "vega"],
+  ["dubhe", "merak"], ["merak", "phecda"], ["phecda", "megrez"], ["megrez", "alioth"],
+  ["alioth", "mizar"], ["mizar", "alkaid"], ["capella", "aldebaran"],
+];
+
+function raDecToVector3(raHours, decDeg, radius) {
+  const ra = (raHours / 24) * Math.PI * 2;
+  const dec = THREE.MathUtils.degToRad(decDeg);
+
+  const x = -radius * Math.cos(dec) * Math.sin(ra);
+  const y = radius * Math.sin(dec);
+  const z = -radius * Math.cos(dec) * Math.cos(ra);
+
+  return new THREE.Vector3(x, y, z);
+}
+
+function starSizeFromMagnitude(mag) {
+  const normalized = THREE.MathUtils.clamp((2.8 - mag) / 4.8, 0.08, 1);
+  return 0.045 + normalized * 0.11;
+}
+
+function randomSpherePoint(radius) {
+  const u = Math.random();
+  const v = Math.random();
+
+  const theta = 2 * Math.PI * u;
+  const phi = Math.acos(2 * v - 1);
+
+  const x = radius * Math.sin(phi) * Math.cos(theta);
+  const y = radius * Math.cos(phi);
+  const z = radius * Math.sin(phi) * Math.sin(theta);
+
+  return new THREE.Vector3(x, y, z);
+}
+
+function createBackgroundStarPositions(count, radius) {
+  const positions = new Float32Array(count * 3);
+
+  for (let i = 0; i < count; i += 1) {
+    const p = randomSpherePoint(radius - Math.random() * 1.8);
+    positions[i * 3 + 0] = p.x;
+    positions[i * 3 + 1] = p.y;
+    positions[i * 3 + 2] = p.z;
+  }
+
+  return positions;
+}
+
+function createDustPositions(count) {
+  const positions = new Float32Array(count * 3);
+
+  for (let i = 0; i < count; i += 1) {
+    positions[i * 3 + 0] = (Math.random() - 0.5) * 22;
+    positions[i * 3 + 1] = (Math.random() - 0.2) * 12;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 22;
+  }
+
+  return positions;
+}
+
+export function createArrivalStarMapSky() {
+  const group = new THREE.Group();
+  const radius = 44;
+
+  group.position.set(0, 1.8, 0);
+  group.rotation.y = -0.84;
+  group.rotation.x = 0.12;
+
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 80, 52),
+    new THREE.MeshBasicMaterial({
+      color: 0x01030a,
+      transparent: true,
+      opacity: 0.999,
+      side: THREE.BackSide,
+      depthWrite: false,
+    })
+  );
+  group.add(dome);
+
+  const starLookup = new Map();
+  const brightStars = [];
+  const corePositions = [];
+
+  STAR_DATA.forEach((star, index) => {
+    const pos = raDecToVector3(star.ra, star.dec, radius - 1.0);
+    starLookup.set(star.id, pos.clone());
+    corePositions.push(pos.x, pos.y, pos.z);
+
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(starSizeFromMagnitude(star.mag), 12, 12),
+      new THREE.MeshBasicMaterial({
+        color: star.mag < 0.8 ? 0xf8fbff : 0xc7d9ff,
+        transparent: true,
+        opacity: star.mag < 1.2 ? 0.98 : 0.8,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+
+    glow.position.copy(pos);
+    glow.userData.twinkleOffset = index * 0.67;
+    group.add(glow);
+    brightStars.push(glow);
+  });
+
+  const backgroundGeometry = new THREE.BufferGeometry();
+  backgroundGeometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(createBackgroundStarPositions(3400, radius), 3)
+  );
+
+  const backgroundStars = new THREE.Points(
+    backgroundGeometry,
+    new THREE.PointsMaterial({
+      color: 0xbcd2ff,
+      size: 0.09,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+    })
+  );
+  group.add(backgroundStars);
+
+  const coreGeometry = new THREE.BufferGeometry();
+  coreGeometry.setAttribute("position", new THREE.Float32BufferAttribute(corePositions, 3));
+
+  const coreStars = new THREE.Points(
+    coreGeometry,
+    new THREE.PointsMaterial({
+      color: 0xe6efff,
+      size: 0.14,
+      transparent: true,
+      opacity: 0.99,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+    })
+  );
+  group.add(coreStars);
+
+  const linePositions = [];
+  SEGMENTS.forEach(([a, b]) => {
+    const pa = starLookup.get(a);
+    const pb = starLookup.get(b);
+    if (!pa || !pb) return;
+    linePositions.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
+  });
+
+  const lineGeometry = new THREE.BufferGeometry();
+  lineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(linePositions, 3));
+
+  const constellationLines = new THREE.LineSegments(
+    lineGeometry,
+    new THREE.LineBasicMaterial({
+      color: 0x7a98de,
+      transparent: true,
+      opacity: 0.62,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+  );
+  group.add(constellationLines);
+
+  const dustGeometry = new THREE.BufferGeometry();
+  dustGeometry.setAttribute("position", new THREE.Float32BufferAttribute(createDustPositions(1200), 3));
+
+  const ambientDust = new THREE.Points(
+    dustGeometry,
+    new THREE.PointsMaterial({
+      color: 0x7a8fb8,
+      size: 0.055,
+      transparent: true,
+      opacity: 0.16,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+    })
+  );
+  group.add(ambientDust);
+
+  const focusStar = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 18, 18),
+    new THREE.MeshBasicMaterial({
+      color: 0xf8fbff,
+      transparent: true,
+      opacity: 0.98,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+  );
+  focusStar.position.copy(raDecToVector3(18.6156, 38.7837, radius - 1.1));
+  group.add(focusStar);
+
+  const horizonGlow = new THREE.Mesh(
+    new THREE.RingGeometry(6.6, 11.8, 128),
+    new THREE.MeshBasicMaterial({
+      color: 0x213b63,
+      transparent: true,
+      opacity: 0.08,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    })
+  );
+  horizonGlow.rotation.x = -Math.PI / 2;
+  horizonGlow.position.set(0, -1.68, 0);
+  group.add(horizonGlow);
+
+  return {
+    group,
+    dome,
+    backgroundStars,
+    coreStars,
+    brightStars,
+    constellationLines,
+    focusStar,
+    horizonGlow,
+    ambientDust,
+  };
+}
+
+export function updateArrivalStarMap(starSky, { elapsed, emphasis, voice, viewerLocal }) {
+  if (!starSky) return;
+
+  const wave = 0.5 + Math.sin(elapsed * 0.42) * 0.5;
+  const breath = 0.5 + Math.cos(elapsed * 0.34 + 0.7) * 0.5;
+
+  if (viewerLocal) {
+    starSky.group.position.x = viewerLocal.x;
+    starSky.group.position.y = viewerLocal.y + 1.8;
+    starSky.group.position.z = viewerLocal.z;
+  }
+
+  starSky.group.rotation.y += 0.00012;
+  starSky.group.rotation.z = Math.sin(elapsed * 0.08) * 0.004;
+
+  starSky.backgroundStars.material.opacity =
+    0.84 +
+    emphasis * 0.08 +
+    voice.brightness * 0.04;
+
+  starSky.coreStars.material.opacity =
+    0.94 +
+    emphasis * 0.05 +
+    voice.presence * 0.03;
+
+  starSky.constellationLines.material.opacity =
+    0.42 +
+    emphasis * 0.10 +
+    voice.presence * 0.05 +
+    wave * 0.03;
+
+  starSky.horizonGlow.material.opacity =
+    0.06 +
+    emphasis * 0.04 +
+    voice.bloom * 0.02;
+
+  starSky.ambientDust.rotation.y += 0.0005;
+  starSky.ambientDust.material.opacity =
+    0.10 +
+    emphasis * 0.03 +
+    breath * 0.02 +
+    voice.bloom * 0.02;
+
+  starSky.focusStar.scale.setScalar(
+    1 + wave * 0.12 + emphasis * 0.06 + voice.bloom * 0.05
+  );
+  starSky.focusStar.material.opacity =
+    0.84 + emphasis * 0.05 + voice.brightness * 0.03;
+
+  starSky.brightStars.forEach((star, index) => {
+    const twinkle = 0.5 + Math.sin(elapsed * (0.82 + index * 0.012) + star.userData.twinkleOffset) * 0.5;
+    const scale = 0.98 + twinkle * 0.18 + emphasis * 0.05 + voice.bloom * 0.03;
+    star.scale.setScalar(scale);
+    star.material.opacity =
+      0.68 + twinkle * 0.14 + emphasis * 0.04 + voice.presence * 0.03;
+  });
+}

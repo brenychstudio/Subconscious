@@ -1,0 +1,263 @@
+﻿import * as THREE from "three";
+
+function makeCanvas(width, height) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+function wrapText(ctx, text, maxWidth) {
+  const words = text.split(" ");
+  const lines = [];
+  let current = "";
+
+  words.forEach((word) => {
+    const candidate = current ? current + " " + word : word;
+    if (ctx.measureText(candidate).width > maxWidth) {
+      if (current) lines.push(current);
+      current = word;
+      return;
+    }
+    current = candidate;
+  });
+
+  if (current) lines.push(current);
+  return lines;
+}
+
+function drawPrompt(ctx, width, height, label, progress) {
+  ctx.clearRect(0, 0, width, height);
+
+  ctx.fillStyle = "rgba(8,12,20,0.84)";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = "rgba(210,225,255,0.22)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, width - 2, height - 2);
+
+  ctx.fillStyle = "rgba(246,249,255,0.98)";
+  ctx.font = "700 48px Inter, Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, width * 0.5, height * 0.38);
+
+  ctx.fillStyle = "rgba(188,210,255,0.84)";
+  ctx.font = "400 24px Inter, Arial";
+  ctx.fillText("утримуй погляд • натисни E або клік", width * 0.5, height * 0.60);
+
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.fillRect(width * 0.10, height * 0.80, width * 0.80, 12);
+
+  ctx.fillStyle = "rgba(200,222,255,0.96)";
+  ctx.fillRect(width * 0.10, height * 0.80, width * 0.80 * progress, 12);
+}
+
+function drawLore(ctx, width, height, title, visibleText) {
+  ctx.clearRect(0, 0, width, height);
+
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, "rgba(8,12,20,0.88)");
+  gradient.addColorStop(1, "rgba(6,10,18,0.92)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = "rgba(210,225,255,0.18)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, width - 2, height - 2);
+
+  ctx.fillStyle = "rgba(255,255,255,0.98)";
+  ctx.font = "700 54px Inter, Arial";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText(title, 72, 66);
+
+  ctx.fillStyle = "rgba(200,214,238,0.94)";
+  ctx.font = "400 30px Inter, Arial";
+
+  let y = 162;
+  const paragraphs = visibleText.split("\n\n").filter(Boolean);
+
+  paragraphs.forEach((paragraph) => {
+    const lines = wrapText(ctx, paragraph, width - 144);
+    lines.forEach((line) => {
+      ctx.fillText(line, 72, y);
+      y += 40;
+    });
+    y += 26;
+  });
+}
+
+export function createConstellationLoreOverlay({ scene }) {
+  const root = new THREE.Group();
+  root.name = "constellation-lore-overlay";
+  scene.add(root);
+
+  const promptCanvas = makeCanvas(1280, 320);
+  const promptCtx = promptCanvas.getContext("2d");
+  const promptTexture = new THREE.CanvasTexture(promptCanvas);
+  promptTexture.colorSpace = THREE.SRGBColorSpace;
+
+  const promptMaterial = new THREE.MeshBasicMaterial({
+    map: promptTexture,
+    transparent: true,
+    depthWrite: false,
+    toneMapped: false,
+    opacity: 0,
+  });
+
+  const promptMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.48, 0.36),
+    promptMaterial
+  );
+  promptMesh.visible = false;
+  root.add(promptMesh);
+
+  const loreCanvas = makeCanvas(1280, 920);
+  const loreCtx = loreCanvas.getContext("2d");
+  const loreTexture = new THREE.CanvasTexture(loreCanvas);
+  loreTexture.colorSpace = THREE.SRGBColorSpace;
+
+  const loreMaterial = new THREE.MeshBasicMaterial({
+    map: loreTexture,
+    transparent: true,
+    depthWrite: false,
+    toneMapped: false,
+    opacity: 0,
+  });
+
+  const loreMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.46, 1.02),
+    loreMaterial
+  );
+  loreMesh.visible = false;
+  root.add(loreMesh);
+
+  let promptTargetOpacity = 0;
+  let promptWorldPosition = null;
+  let promptScaleTarget = 1;
+
+  let loreTargetOpacity = 0;
+  let loreWorldPosition = null;
+  let loreTitle = "";
+  let loreParagraphs = [];
+  let loreWordIndex = 0;
+  let loreWordTimer = 0;
+  let loreRevealStarted = false;
+
+  function setPromptState({ visible, label, progress, worldPosition }) {
+    promptWorldPosition = worldPosition ? worldPosition.clone() : null;
+    promptTargetOpacity = visible ? 1 : 0;
+    promptScaleTarget = 0.94 + progress * 0.06;
+
+    if (visible) {
+      drawPrompt(promptCtx, promptCanvas.width, promptCanvas.height, label, progress);
+      promptTexture.needsUpdate = true;
+      promptMesh.visible = true;
+    }
+  }
+
+  function openLore({ title, body }) {
+    loreTitle = title ?? "";
+    loreParagraphs = Array.isArray(body) ? body : [String(body ?? "")];
+    loreWordIndex = 0;
+    loreWordTimer = 0;
+    loreRevealStarted = true;
+    loreTargetOpacity = 1;
+    loreMesh.visible = true;
+  }
+
+  function closeLore() {
+    loreTargetOpacity = 0;
+    loreRevealStarted = false;
+  }
+
+  function setLoreWorldPosition(nextPosition) {
+    loreWorldPosition = nextPosition ? nextPosition.clone() : null;
+  }
+
+  function getVisibleLoreText() {
+    const words = loreParagraphs.join("\n\n").split(" ");
+    const visible = words.slice(0, loreWordIndex).join(" ");
+    return visible;
+  }
+
+  function update({ camera, dtMs = 16, xrPresenting = false }) {
+    if (xrPresenting) {
+      promptTargetOpacity = 0;
+      loreTargetOpacity = 0;
+
+      promptMaterial.opacity = 0;
+      loreMaterial.opacity = 0;
+
+      promptMesh.visible = false;
+      loreMesh.visible = false;
+      return;
+    }
+
+    const promptLerp = 1 - Math.pow(0.001, dtMs / 220);
+    const loreLerp = 1 - Math.pow(0.001, dtMs / 320);
+
+    promptMaterial.opacity += (promptTargetOpacity - promptMaterial.opacity) * promptLerp;
+    promptMesh.scale.lerp(new THREE.Vector3(promptScaleTarget, promptScaleTarget, 1), promptLerp);
+
+    if (promptWorldPosition) {
+      promptMesh.position.lerp(promptWorldPosition, promptLerp);
+      promptMesh.lookAt(camera.position);
+    }
+
+    if (promptMaterial.opacity <= 0.01 && promptTargetOpacity <= 0) {
+      promptMesh.visible = false;
+    }
+
+    loreMaterial.opacity += (loreTargetOpacity - loreMaterial.opacity) * loreLerp;
+
+    if (loreWorldPosition) {
+      loreMesh.position.lerp(loreWorldPosition, loreLerp);
+      loreMesh.lookAt(camera.position);
+    }
+
+    if (loreRevealStarted && loreMesh.visible) {
+      loreWordTimer += dtMs;
+      while (loreWordTimer >= 45) {
+        loreWordTimer -= 45;
+        loreWordIndex += 1;
+      }
+
+      drawLore(
+        loreCtx,
+        loreCanvas.width,
+        loreCanvas.height,
+        loreTitle,
+        getVisibleLoreText()
+      );
+      loreTexture.needsUpdate = true;
+    }
+
+    if (loreMaterial.opacity <= 0.01 && loreTargetOpacity <= 0) {
+      loreMesh.visible = false;
+    }
+  }
+
+  function dispose() {
+    scene.remove(root);
+
+    promptMesh.geometry.dispose();
+    promptMaterial.map.dispose();
+    promptMaterial.dispose();
+
+    loreMesh.geometry.dispose();
+    loreMaterial.map.dispose();
+    loreMaterial.dispose();
+  }
+
+  return {
+    root,
+    setPromptState,
+    openLore,
+    closeLore,
+    setLoreWorldPosition,
+    update,
+    dispose,
+  };
+}

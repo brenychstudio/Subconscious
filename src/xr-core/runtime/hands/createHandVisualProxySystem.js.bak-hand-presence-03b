@@ -1,0 +1,423 @@
+﻿import * as THREE from "three";
+
+const FINGER_KEYS = ["thumb", "index", "middle", "ring", "pinky"];
+
+const DEFAULT_TIPS = {
+  left: {
+    thumb: [-0.05, -0.01, 0.01],
+    index: [-0.028, 0.012, -0.07],
+    middle: [-0.008, 0.018, -0.086],
+    ring: [0.012, 0.012, -0.076],
+    pinky: [0.03, 0.0, -0.058],
+  },
+  right: {
+    thumb: [0.05, -0.01, 0.01],
+    index: [0.028, 0.012, -0.07],
+    middle: [0.008, 0.018, -0.086],
+    ring: [-0.012, 0.012, -0.076],
+    pinky: [-0.03, 0.0, -0.058],
+  },
+};
+
+const BASE_POINTS = {
+  left: {
+    thumb: [-0.022, -0.012, -0.006],
+    index: [-0.015, 0.0, -0.024],
+    middle: [-0.004, 0.003, -0.03],
+    ring: [0.008, 0.0, -0.024],
+    pinky: [0.018, -0.004, -0.012],
+  },
+  right: {
+    thumb: [0.022, -0.012, -0.006],
+    index: [0.015, 0.0, -0.024],
+    middle: [0.004, 0.003, -0.03],
+    ring: [-0.008, 0.0, -0.024],
+    pinky: [-0.018, -0.004, -0.012],
+  },
+};
+
+const ROOM_MULTIPLIER = {
+  "hall-of-arrival": 0.62,
+  "signal-corridor": 0.82,
+  "membrane-chamber": 1.0,
+  "portal-atrium": 1.12,
+};
+
+function getRoomVisualMultiplier(roomId) {
+  return ROOM_MULTIPLIER[roomId] ?? 0.86;
+}
+
+function createProxyVisual(side) {
+  const group = new THREE.Group();
+  group.name = `${side}-hand-proxy-root`;
+
+  const palmOuterMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#b8cbff"),
+    transparent: true,
+    opacity: 0.18,
+    wireframe: true,
+    depthWrite: false,
+  });
+
+  const palmInnerMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#9bbcff"),
+    transparent: true,
+    opacity: 0.08,
+    depthWrite: false,
+  });
+
+  const coreMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#f5f8ff"),
+    transparent: true,
+    opacity: 0.36,
+    depthWrite: false,
+  });
+
+  const ringMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#9bbcff"),
+    transparent: true,
+    opacity: 0.12,
+    depthWrite: false,
+  });
+
+  const lineMaterial = new THREE.LineBasicMaterial({
+    color: new THREE.Color("#d5e2ff"),
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+  });
+
+  const tipMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#ffffff"),
+    transparent: true,
+    opacity: 0.62,
+    depthWrite: false,
+  });
+
+  const palmOuter = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.058, 2),
+    palmOuterMaterial
+  );
+  palmOuter.renderOrder = 20;
+  group.add(palmOuter);
+
+  const palmInner = new THREE.Mesh(
+    new THREE.SphereGeometry(0.041, 20, 20),
+    palmInnerMaterial
+  );
+  palmInner.renderOrder = 21;
+  palmInner.scale.set(1.06, 1.18, 0.92);
+  group.add(palmInner);
+
+  const palmCore = new THREE.Mesh(
+    new THREE.SphereGeometry(0.018, 18, 18),
+    coreMaterial
+  );
+  palmCore.renderOrder = 22;
+  palmCore.position.set(0, 0.004, -0.014);
+  group.add(palmCore);
+
+  const ringA = new THREE.Mesh(
+    new THREE.TorusGeometry(0.084, 0.0016, 8, 56),
+    ringMaterial
+  );
+  ringA.renderOrder = 19;
+  ringA.rotation.x = Math.PI * 0.5;
+  ringA.rotation.y = side === "left" ? -0.34 : 0.34;
+  group.add(ringA);
+
+  const ringB = new THREE.Mesh(
+    new THREE.TorusGeometry(0.061, 0.0012, 8, 48),
+    ringMaterial.clone()
+  );
+  ringB.material.opacity = 0.08;
+  ringB.renderOrder = 19;
+  ringB.rotation.z = side === "left" ? 0.52 : -0.52;
+  ringB.rotation.x = Math.PI * 0.28;
+  group.add(ringB);
+
+  const lineGeometry = new THREE.BufferGeometry();
+  const linePositions = new Float32Array(FINGER_KEYS.length * 2 * 3);
+  lineGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(linePositions, 3)
+  );
+
+  const fingerLines = new THREE.LineSegments(lineGeometry, lineMaterial);
+  fingerLines.renderOrder = 18;
+  group.add(fingerLines);
+
+  const fingertips = {};
+  FINGER_KEYS.forEach((key) => {
+    const tip = new THREE.Mesh(
+      new THREE.SphereGeometry(0.008, 12, 12),
+      tipMaterial.clone()
+    );
+    tip.renderOrder = 23;
+    group.add(tip);
+    fingertips[key] = tip;
+  });
+
+  group.userData = {
+    palmOuter,
+    palmInner,
+    palmCore,
+    ringA,
+    ringB,
+    fingerLines,
+    linePositions,
+    fingertips,
+    materials: [
+      palmOuterMaterial,
+      palmInnerMaterial,
+      coreMaterial,
+      ringMaterial,
+      ringB.material,
+      lineMaterial,
+      tipMaterial,
+      ...Object.values(fingertips).map((x) => x.material),
+    ],
+  };
+
+  return group;
+}
+
+function createProxyForSide(side, handPresence) {
+  const mount = handPresence.getMount(side);
+  const proxyRoot = createProxyVisual(side);
+  mount.visualRoot.add(proxyRoot);
+
+  return {
+    side,
+    mount,
+    proxyRoot,
+    ...proxyRoot.userData,
+  };
+}
+
+function setOpacity(material, value) {
+  material.opacity = Math.max(0, value);
+  material.visible = material.opacity > 0.001;
+}
+
+export function createHandVisualProxySystem({
+  handPresence,
+  showFallbackVisuals = false,
+  strictTrackedTips = true,
+}) {
+  const tempWorld = new THREE.Vector3();
+  const debug = new THREE.Vector3();
+
+  const left = createProxyForSide("left", handPresence);
+  const right = createProxyForSide("right", handPresence);
+
+  const sides = [left, right];
+
+  const applyStaticTips = (proxy, sideState) => {
+    const defaults = DEFAULT_TIPS[proxy.side];
+
+    FINGER_KEYS.forEach((key) => {
+      const tip = proxy.fingertips[key];
+      const pos = defaults[key];
+      tip.position.set(pos[0], pos[1], pos[2]);
+      tip.visible = true;
+    });
+
+    return false;
+  };
+
+  const applyTrackedTips = (proxy, sideState) => {
+    let hasAny = false;
+
+    FINGER_KEYS.forEach((key) => {
+      const anchor = proxy.mount.fingertipAnchors[key];
+      const tip = proxy.fingertips[key];
+
+      if (!anchor || !anchor.visible) {
+        tip.visible = false;
+        return;
+      }
+
+      tempWorld.setFromMatrixPosition(anchor.matrixWorld);
+      proxy.proxyRoot.worldToLocal(tempWorld);
+      tip.position.copy(tempWorld);
+      tip.visible = true;
+      hasAny = true;
+    });
+
+    return hasAny;
+  };
+
+  const updateLineGeometry = (proxy) => {
+    let i = 0;
+    const bases = BASE_POINTS[proxy.side];
+
+    FINGER_KEYS.forEach((key) => {
+      const base = bases[key];
+      const tip = proxy.fingertips[key];
+
+      proxy.linePositions[i++] = base[0];
+      proxy.linePositions[i++] = base[1];
+      proxy.linePositions[i++] = base[2];
+
+      proxy.linePositions[i++] = tip.position.x;
+      proxy.linePositions[i++] = tip.position.y;
+      proxy.linePositions[i++] = tip.position.z;
+    });
+
+    proxy.fingerLines.geometry.attributes.position.needsUpdate = true;
+    proxy.fingerLines.geometry.computeBoundingSphere();
+  };
+
+  const updateProxy = (proxy, timeMs, currentRoomId) => {
+    const sideState = handPresence.getSide(proxy.side);
+    const isVisible =
+      Boolean(sideState.presenting) &&
+      Boolean(sideState.connected) &&
+      Boolean(sideState.visible);
+
+    const canRenderSource =
+      sideState.source === "hand-tracking" || showFallbackVisuals;
+
+    proxy.proxyRoot.visible = isVisible && canRenderSource;
+    proxy.mount.visualRoot.visible = isVisible && canRenderSource;
+
+    if (!isVisible || !canRenderSource) {
+      return;
+    }
+
+    const roomMult =
+      sideState.worldResponseMultiplier || getRoomVisualMultiplier(currentRoomId);
+
+    const sourceMult =
+      sideState.source === "hand-tracking"
+        ? 1
+        : sideState.source === "controller-grip"
+        ? 0.88
+        : 0.76;
+
+    const gestureBoost =
+      sideState.gesture === "invoke"
+        ? 0.26
+        : sideState.gesture === "hold"
+        ? 0.16
+        : sideState.gesture === "hover"
+        ? 0.08
+        : 0;
+
+    const pulse =
+      0.5 + 0.5 * Math.sin(timeMs * 0.0021 + (proxy.side === "left" ? 0.4 : 1.1));
+
+    const baseOpacity = 0.12 * roomMult * sourceMult;
+    const shellOpacity = baseOpacity + pulse * 0.04 + gestureBoost * 0.35;
+    const innerOpacity = 0.06 * roomMult + pulse * 0.03 + gestureBoost * 0.18;
+    const coreOpacity = 0.24 * roomMult + pulse * 0.08 + gestureBoost * 0.28;
+    const ringOpacity = 0.08 * roomMult + pulse * 0.03 + gestureBoost * 0.12;
+    const lineOpacity = 0.10 * roomMult + gestureBoost * 0.12;
+    const tipOpacity = 0.34 * roomMult + pulse * 0.12 + gestureBoost * 0.28;
+
+    setOpacity(proxy.palmOuter.material, shellOpacity);
+    setOpacity(proxy.palmInner.material, innerOpacity);
+    setOpacity(proxy.palmCore.material, coreOpacity);
+    setOpacity(proxy.ringA.material, ringOpacity);
+    setOpacity(proxy.ringB.material, ringOpacity * 0.72);
+    setOpacity(proxy.fingerLines.material, lineOpacity);
+
+    Object.values(proxy.fingertips).forEach((tip) => {
+      setOpacity(tip.material, tipOpacity);
+    });
+
+    const scaleBase =
+      sideState.source === "hand-tracking"
+        ? 1
+        : 0.94;
+
+    const scalePulse = 1 + pulse * 0.035 + gestureBoost * 0.06;
+    proxy.proxyRoot.scale.setScalar(scaleBase * scalePulse);
+
+    proxy.palmInner.scale.set(
+      1.04 + pulse * 0.05,
+      1.16 + pulse * 0.06,
+      0.92 + pulse * 0.03
+    );
+
+    proxy.palmCore.scale.setScalar(1 + pulse * 0.12 + gestureBoost * 0.16);
+
+    proxy.ringA.rotation.z += 0.003 + gestureBoost * 0.002;
+    proxy.ringB.rotation.y += 0.002 + gestureBoost * 0.0015;
+
+    const hasTrackedTips =
+      sideState.source === "hand-tracking"
+        ? applyTrackedTips(proxy, sideState)
+        : false;
+
+    if (!hasTrackedTips && showFallbackVisuals) {
+      applyStaticTips(proxy, sideState);
+    }
+
+    if (!hasTrackedTips && strictTrackedTips && sideState.source === "hand-tracking") {
+      Object.values(proxy.fingertips).forEach((tip) => {
+        tip.visible = false;
+      });
+      proxy.fingerLines.visible = false;
+    } else {
+      proxy.fingerLines.visible = true;
+    }
+
+    updateLineGeometry(proxy);
+
+    proxy.proxyRoot.position.set(0, 0, 0);
+
+    if (sideState.source !== "hand-tracking") {
+      proxy.proxyRoot.rotation.x = -0.18;
+      proxy.proxyRoot.rotation.z = proxy.side === "left" ? 0.12 : -0.12;
+    } else {
+      proxy.proxyRoot.rotation.set(0, 0, 0);
+    }
+
+    debug.set(
+      sideState.proximityIntensity || 0,
+      sideState.contactIntensity || 0,
+      sideState.ritualCharge || 0
+    );
+  };
+
+  const update = ({
+    currentRoomId = "",
+    timeMs = performance.now(),
+  } = {}) => {
+    sides.forEach((proxy) => updateProxy(proxy, timeMs, currentRoomId));
+  };
+
+  const dispose = () => {
+    sides.forEach((proxy) => {
+      try {
+        proxy.proxyRoot.removeFromParent();
+      } catch {}
+
+      [
+        proxy.palmOuter.geometry,
+        proxy.palmInner.geometry,
+        proxy.palmCore.geometry,
+        proxy.ringA.geometry,
+        proxy.ringB.geometry,
+        proxy.fingerLines.geometry,
+        ...Object.values(proxy.fingertips).map((tip) => tip.geometry),
+      ].forEach((geometry) => {
+        try { geometry.dispose(); } catch {}
+      });
+
+      proxy.materials.forEach((material) => {
+        try { material.dispose(); } catch {}
+      });
+    });
+  };
+
+  return {
+    update,
+    dispose,
+  };
+}
+
+
+

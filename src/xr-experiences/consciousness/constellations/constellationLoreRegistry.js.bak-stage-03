@@ -1,0 +1,51 @@
+﻿export const CONSTELLATION_LORE_REGISTRY = [
+  {
+    id: "great-bear-01",
+
+    targetStarIds: [
+      "dubhe",
+      "merak",
+      "phecda",
+      "megrez",
+      "alioth",
+      "mizar",
+      "alkaid"
+    ],
+
+    promptLabel: "Велика Ведмедиця",
+    promptReadyLabel: "E • Відкрити сузір'я",
+
+    dwellMs: 900,
+    focusAngleDeg: 8.0,
+    focusReleaseDeg: 11.5,
+
+    promptLift: 0.26,
+
+    revealDistance: 2.25,
+    revealLift: 0.02,
+    revealSide: -0.72,
+    revealScale: 1.34,
+
+    overlayDistance: 2.65,
+    overlayLift: 0.04,
+    overlaySide: 0.82,
+
+    openDurationMs: 1350,
+    closeDurationMs: 1100,
+    panelDelayMs: 380,
+
+    title: "Ursa Major · Велика Ведмедиця",
+    body: [
+      "Велика Ведмедиця — одне з найупізнаваніших сузір’їв північного неба. У цьому світі вона працює не як навчальна схема, а як перший небесний архів.",
+      "Коли користувач утримує на ній увагу, небо перестає бути просто фоном: сузір’я відгукується, входить у простір і відкриває короткий міфопоетичний шар знання.",
+      "Цей reveal перевіряє базову interaction grammar Whisper XR: gaze, attunement, confirmation, cinematic pull-in, reading state, return."
+    ],
+  },
+];
+
+export function getConstellationLoreEntry(id = "great-bear-01") {
+  return (
+    CONSTELLATION_LORE_REGISTRY.find((entry) => entry.id === id) ??
+    CONSTELLATION_LORE_REGISTRY[0]
+  );
+}

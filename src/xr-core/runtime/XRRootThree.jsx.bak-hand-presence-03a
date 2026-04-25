@@ -1,0 +1,1590 @@
+﻿import { getConstellationLoreEntry } from "../../xr-experiences/consciousness/constellations/constellationLoreRegistry.js";
+import { createConstellationFocusSystem } from "../../xr-experiences/consciousness/constellations/createConstellationFocusSystem.js";
+import { createConstellationLoreOverlay } from "../../xr-experiences/consciousness/constellations/createConstellationLoreOverlay.js";
+import { createConstellationRevealController } from "../../xr-experiences/consciousness/constellations/createConstellationRevealController.js";
+import { useEffect, useRef } from "react";
+import * as THREE from "three";
+import { VRButton } from "three/examples/jsm/webxr/VRButton.js";
+import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
+import { createEnvironmentShell } from "./helpers/createEnvironmentShell.js";
+import { createGateCue } from "./helpers/createGateCue.js";
+import { createInteractionShell } from "./helpers/createInteractionShell.js";
+import { createLocomotionShell } from "./helpers/createLocomotionShell.js";
+import { createHandPresenceSystem } from "./hands/createHandPresenceSystem.js";
+import { createHandVisualProxySystem } from "./hands/createHandVisualProxySystem.js";
+import { createHandContactReadinessSystem } from "./hands/createHandContactReadinessSystem.js";
+import { roomRegistry } from "../../xr-experiences/consciousness/world/roomRegistry.js";
+import { portalRegistry } from "../../xr-experiences/consciousness/world/portalRegistry.js";
+import { createInitialWorldState } from "../../xr-experiences/consciousness/world/worldState.js";
+import { WORLD_VISUALS, getRoomPreset } from "../../xr-experiences/consciousness/world/spatialLanguage.js";
+import { createRitualSoundEngine } from "../../xr-experiences/consciousness/audio/RitualSoundEngine.js";
+import { createVoiceSeedEngine } from "../../xr-experiences/consciousness/voice/VoiceSeedEngine.js";
+import { createVoiceSculptureProto, updateVoiceSculptureProto } from "../../xr-experiences/consciousness/voice/VoiceSculptureProto.js";
+import { createPortalInvocationProto, updatePortalInvocationProto } from "../../xr-experiences/consciousness/voice/PortalInvocationProto.js";
+import { createStillnessProtoTracker, createStillnessField, updateStillnessField } from "../../xr-experiences/consciousness/presence/StillnessProto.js";
+import {
+  createArrivalCelestialSkySystem,
+  updateArrivalCelestialSkySystem,
+  disposeArrivalCelestialSkySystem,
+} from "../../xr-experiences/consciousness/sky/ArrivalCelestialSkySystem.js";
+import { createArrivalFallingStarsSystem } from "../../xr-experiences/consciousness/sky/createArrivalFallingStarsSystem.js";
+
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function disposeMaterial(material) {
+  if (!material) return;
+  if (Array.isArray(material)) {
+    material.forEach(disposeMaterial);
+    return;
+  }
+  if (material.map) material.map.dispose?.();
+  if (material.alphaMap) material.alphaMap.dispose?.();
+  material.dispose?.();
+}
+
+function disposeObjectTree(root) {
+  if (!root) return;
+  root.traverse((obj) => {
+    if (obj.geometry) obj.geometry.dispose?.();
+    if (obj.material) disposeMaterial(obj.material);
+  });
+}
+
+function makeAdditiveMaterial(color, opacity) {
+  return new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+}
+
+// Intentionally retained for possible later reuse; the runtime no longer mounts this layer.
+// eslint-disable-next-line no-unused-vars
+function createParticleField() {
+  const count = 360;
+  const positions = new Float32Array(count * 3);
+
+  for (let i = 0; i < count; i += 1) {
+    positions[i * 3 + 0] = (Math.random() - 0.5) * 46;
+    positions[i * 3 + 1] = Math.random() * 9 + 0.2;
+    positions[i * 3 + 2] = -Math.random() * 42 + 7;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+  const material = new THREE.PointsMaterial({
+    color: 0x7894c8,
+    size: 0.017,
+    transparent: true,
+    opacity: 0.08,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+  });
+
+  return new THREE.Points(geometry, material);
+}
+
+function createTransitionField(fromRoom, toRoom) {
+  const group = new THREE.Group();
+
+  const midX = (fromRoom.x + toRoom.x) * 0.5;
+  const midZ = (fromRoom.z + toRoom.z) * 0.5;
+  group.position.set(midX, 0, midZ);
+
+  const dx = toRoom.x - fromRoom.x;
+  const dz = toRoom.z - fromRoom.z;
+  const angle = Math.atan2(dx, dz);
+  group.rotation.y = angle;
+
+  const veilCount = 3;
+
+  for (let i = 0; i < veilCount; i += 1) {
+    const t = veilCount === 1 ? 0.5 : i / (veilCount - 1);
+    const xOffset = lerp(-0.7, 0.7, t);
+
+    const veil = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.35, 3.4),
+      makeAdditiveMaterial(0x88a7ff, 0.045)
+    );
+    veil.position.set(xOffset, 1.75, 0);
+    group.add(veil);
+  }
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.9, 0.018, 12, 72),
+    makeAdditiveMaterial(0xa2bcff, 0.12)
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.set(0, 0.08, 0);
+  group.add(ring);
+
+  return group;
+}
+
+function createArrivalRoom(room) {
+  const preset = room.preset;
+  const group = new THREE.Group();
+  group.position.set(room.x, 0, room.z);
+
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(2.45, 28, 24),
+    new THREE.MeshBasicMaterial({
+      color: preset.shellColor,
+      transparent: true,
+      opacity: 0.0001,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    })
+  );
+  shell.position.y = 2.18;
+  shell.scale.set(1.12, 1.08, 1.12);
+  group.add(shell);
+
+  const celestialSky = createArrivalCelestialSkySystem({
+    presetId: "nightThreshold",
+    initialRoomId: room.id,
+  });
+
+  const groundRingA = new THREE.Mesh(
+    new THREE.RingGeometry(0.96, 1.34, 56),
+    makeAdditiveMaterial(preset.auraColor, 0.04)
+  );
+  groundRingA.rotation.x = -Math.PI / 2;
+  groundRingA.position.y = 0.04;
+  group.add(groundRingA);
+
+  const groundRingB = new THREE.Mesh(
+    new THREE.RingGeometry(1.56, 1.96, 56),
+    makeAdditiveMaterial(preset.pulseColor, 0.012)
+  );
+  groundRingB.rotation.x = -Math.PI / 2;
+  groundRingB.position.y = 0.02;
+  group.add(groundRingB);
+
+  const light = new THREE.PointLight(preset.auraColor, 0.14, 12, 2);
+  light.position.set(0, 3.5, -0.9);
+  group.add(light);
+
+  return {
+    room,
+    group,
+    shell,
+    light,
+    elements: {
+      celestialSky,
+      groundRingA,
+      groundRingB,
+    },
+  };
+}
+
+function createSignalRoom(room) {
+  const preset = room.preset;
+  const group = new THREE.Group();
+  group.position.set(room.x, 0, room.z);
+
+  const shell = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.2, 2.8, 4.1, 32, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: preset.shellColor,
+      transparent: true,
+      opacity: preset.shellOpacity,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    })
+  );
+  shell.position.y = 2.05;
+  group.add(shell);
+
+  const rods = [];
+  const rodXs = [-1.32, -0.92, -0.42, 0.18, 0.72, 1.2];
+  rodXs.forEach((x, i) => {
+    const rod = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 2.35, 0.04),
+      makeAdditiveMaterial(i % 2 === 0 ? preset.auraColor : preset.pulseColor, 0.12)
+    );
+    rod.position.set(x, 1.4, 0.25 + Math.sin(i * 0.9) * 0.24);
+    group.add(rod);
+    rods.push(rod);
+  });
+
+  const waveRing = new THREE.Mesh(
+    new THREE.TorusGeometry(1.18, 0.024, 16, 96),
+    makeAdditiveMaterial(preset.pulseColor, 0.1)
+  );
+  waveRing.rotation.x = Math.PI / 2;
+  waveRing.position.set(0, 1.92, 0.32);
+  group.add(waveRing);
+
+  const floorTrace = new THREE.Mesh(
+    new THREE.RingGeometry(0.92, 1.14, 56),
+    makeAdditiveMaterial(preset.auraColor, 0.13)
+  );
+  floorTrace.rotation.x = -Math.PI / 2;
+  floorTrace.position.y = 0.04;
+  group.add(floorTrace);
+
+  const light = new THREE.PointLight(preset.pulseColor, 0.22, 7, 2);
+  light.position.set(0, 2.2, 0.4);
+  group.add(light);
+
+  return {
+    room,
+    group,
+    shell,
+    light,
+    elements: {
+      rods,
+      waveRing,
+      floorTrace,
+    },
+  };
+}
+
+function createMembraneRoom(room) {
+  const preset = room.preset;
+  const group = new THREE.Group();
+  group.position.set(room.x, 0, room.z);
+
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(2.4, 28, 24),
+    new THREE.MeshBasicMaterial({
+      color: preset.shellColor,
+      transparent: true,
+      opacity: preset.shellOpacity,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      wireframe: true,
+    })
+  );
+  shell.position.y = 2.16;
+  shell.scale.set(0.94, 1.1, 0.94);
+  group.add(shell);
+
+  const membraneCore = new THREE.Mesh(
+    new THREE.SphereGeometry(0.78, 38, 38),
+    makeAdditiveMaterial(preset.coreColor, 0.08)
+  );
+  membraneCore.position.set(0, 2.06, 0.6);
+  membraneCore.userData.handTargetConfig = {
+    id: `${room.id}-core-target`,
+    roomId: room.id,
+    type: "membrane",
+    radius: 1.08,
+    touchRadius: 0.42,
+    weight: 1.25,
+    meta: {
+      responder: "membrane-core",
+    },
+  };
+  group.add(membraneCore);
+
+  const membraneAura = new THREE.Mesh(
+    new THREE.SphereGeometry(1.08, 38, 38),
+    new THREE.MeshBasicMaterial({
+      color: preset.pulseColor,
+      transparent: true,
+      opacity: 0.06,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      wireframe: true,
+    })
+  );
+  membraneAura.position.set(0, 2.06, 0.6);
+  group.add(membraneAura);
+
+  const veils = [];
+  [-0.86, 0, 0.86].forEach((x, i) => {
+    const veil = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.92, 2.46),
+      makeAdditiveMaterial(i === 1 ? preset.auraColor : preset.pulseColor, i === 1 ? 0.07 : 0.045)
+    );
+    veil.position.set(x, 2.0, 0.18 - Math.abs(x) * 0.08);
+    group.add(veil);
+    veils.push(veil);
+  });
+
+  const floorRing = new THREE.Mesh(
+    new THREE.RingGeometry(1.04, 1.28, 64),
+    makeAdditiveMaterial(preset.auraColor, 0.12)
+  );
+  floorRing.rotation.x = -Math.PI / 2;
+  floorRing.position.y = 0.04;
+  group.add(floorRing);
+
+  const light = new THREE.PointLight(preset.pulseColor, 0.24, 8, 2);
+  light.position.set(0, 2.3, 0.72);
+  group.add(light);
+
+  return {
+    room,
+    group,
+    shell,
+    light,
+    elements: {
+      membraneCore,
+      membraneAura,
+      veils,
+      floorRing,
+    },
+  };
+}
+
+function createPortalRoom(room) {
+  const preset = room.preset;
+  const group = new THREE.Group();
+  group.position.set(room.x, 0, room.z);
+
+  const shell = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.35, 2.55, 4.8, 32, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: preset.shellColor,
+      transparent: true,
+      opacity: preset.shellOpacity,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    })
+  );
+  shell.position.y = 2.25;
+  group.add(shell);
+
+  const archOuter = new THREE.Mesh(
+    new THREE.TorusGeometry(0.98, 0.045, 18, 120),
+    makeAdditiveMaterial(preset.auraColor, 0.24)
+  );
+  archOuter.position.set(0, 2.0, 0.8);
+  group.add(archOuter);
+
+  const archInner = new THREE.Mesh(
+    new THREE.TorusGeometry(0.68, 0.022, 18, 96),
+    makeAdditiveMaterial(preset.pulseColor, 0.15)
+  );
+  archInner.position.set(0, 2.0, 0.82);
+  group.add(archInner);
+
+  const membrane = new THREE.Mesh(
+    new THREE.CircleGeometry(0.82, 64),
+    makeAdditiveMaterial(preset.coreColor, 0.05)
+  );
+  membrane.position.set(0, 2.0, 0.78);
+  group.add(membrane);
+
+  const pylons = [];
+  [-0.84, 0.84].forEach((x) => {
+    const pylon = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 2.3, 0.08),
+      makeAdditiveMaterial(preset.auraColor, 0.12)
+    );
+    pylon.position.set(x, 2.02, 0.78);
+    group.add(pylon);
+    pylons.push(pylon);
+  });
+
+  const floorRing = new THREE.Mesh(
+    new THREE.RingGeometry(1.06, 1.34, 64),
+    makeAdditiveMaterial(preset.auraColor, 0.14)
+  );
+  floorRing.rotation.x = -Math.PI / 2;
+  floorRing.position.y = 0.04;
+  group.add(floorRing);
+
+  const light = new THREE.PointLight(preset.pulseColor, 0.28, 9, 2);
+  light.position.set(0, 2.2, 0.88);
+  group.add(light);
+
+  return {
+    room,
+    group,
+    shell,
+    light,
+    elements: {
+      archOuter,
+      archInner,
+      membrane,
+      pylons,
+      floorRing,
+    },
+  };
+}
+
+function buildRoomEntry(room) {
+  if (room.id === "hall-of-arrival") return createArrivalRoom(room);
+  if (room.id === "signal-corridor") return createSignalRoom(room);
+  if (room.id === "membrane-chamber") return createMembraneRoom(room);
+  if (room.id === "portal-atrium") return createPortalRoom(room);
+  return createArrivalRoom(room);
+}
+
+export default function XRRootThree({ manifest, options, xrSupported, xrChecked, worldRuntime }) {
+  const hostRef = useRef(null);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+
+    host.innerHTML = "";
+    host.style.position = "relative";
+    host.style.background = WORLD_VISUALS.baseBg;
+    host.style.overflow = "hidden";
+
+    const width = Math.max(1, host.clientWidth);
+    const height = Math.max(1, host.clientHeight);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(WORLD_VISUALS.baseBg);
+    scene.fog = new THREE.FogExp2(WORLD_VISUALS.baseBg, WORLD_VISUALS.fogDensity);
+
+    const camera = new THREE.PerspectiveCamera(66, width / height, 0.01, 220);
+    camera.position.set(0, 1.68, 0);
+
+    const rig = new THREE.Group();
+    rig.position.set(0, 0, 3.9);
+    rig.add(camera);
+    scene.add(rig);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance",
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, options?.quality?.maxDpr ?? 1.5));
+    renderer.setSize(width, height);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.92;
+    renderer.xr.enabled = true;
+    renderer.xr.setReferenceSpaceType("local-floor");
+    host.appendChild(renderer.domElement);
+
+    const vrButton = VRButton.createButton(renderer);
+    vrButton.style.zIndex = "40";
+    host.appendChild(vrButton);
+    console.log("[XR boot]", {
+      secure: window.isSecureContext,
+      hasXR: !!navigator.xr,
+      xrSupportedProp: xrSupported,
+      xrCheckedProp: xrChecked,
+    });
+
+    const ritualSound = createRitualSoundEngine();
+    const voiceSeed = createVoiceSeedEngine();
+
+    const pointerLock = new PointerLockControls(camera, renderer.domElement);
+    pointerLock.pointerSpeed = options?.timings?.mouseLookSpeed ?? 0.28;
+
+    const voiceBadge = document.createElement("div");
+    voiceBadge.style.position = "absolute";
+    voiceBadge.style.right = "16px";
+    voiceBadge.style.top = "16px";
+    voiceBadge.style.zIndex = "21";
+    voiceBadge.style.padding = "8px 10px";
+    voiceBadge.style.fontSize = "9px";
+    voiceBadge.style.letterSpacing = "0.16em";
+    voiceBadge.style.textTransform = "uppercase";
+    voiceBadge.style.color = "rgba(255,255,255,0.76)";
+    voiceBadge.style.background = "rgba(8,12,20,0.30)";
+    voiceBadge.style.border = "1px solid rgba(255,255,255,0.10)";
+    voiceBadge.style.backdropFilter = "blur(8px)";
+    voiceBadge.style.webkitBackdropFilter = "blur(8px)";
+    voiceBadge.style.userSelect = "none";
+    voiceBadge.style.cursor = "pointer";
+    voiceBadge.textContent = "Voice · Off · V";
+    host.appendChild(voiceBadge);
+
+    const updateVoiceBadge = (state) => {
+      if (state?.error) {
+        voiceBadge.textContent = "Voice Seed · Error";
+        return;
+      }
+
+      if (!state?.enabled) {
+        voiceBadge.textContent = "Voice Seed · Off · press V";
+        return;
+      }
+
+      if (state?.calibrating) {
+        voiceBadge.textContent = "Voice Seed · Calibrating";
+        return;
+      }
+
+      if (state?.active) {
+        voiceBadge.textContent = "Voice Seed · Listening";
+        return;
+      }
+
+      voiceBadge.textContent = "Voice Seed · Enabled";
+    };
+
+    const enableSound = async () => {
+      await ritualSound.resume();
+    };
+
+    const onHostClick = async () => {
+      await enableSound();
+
+      if (!renderer.xr.isPresenting && document.pointerLockElement !== renderer.domElement) {
+        pointerLock.lock();
+      }
+    };
+
+    const toggleVoice = async () => {
+      await enableSound();
+      const state = await voiceSeed.toggle();
+      updateVoiceBadge(state);
+    };
+
+    const onKeyDown = async (event) => {
+      if (event.code === "KeyV") {
+        event.preventDefault();
+        await toggleVoice();
+      }
+    };
+
+    host.addEventListener("click", onHostClick);
+    voiceBadge.addEventListener("click", toggleVoice);
+    window.addEventListener("keydown", onKeyDown);
+
+    const hemi = new THREE.HemisphereLight(0xdce7ff, 0x04070d, 0.72);
+    scene.add(hemi);
+
+    const dir = new THREE.DirectionalLight(0xffffff, 0.38);
+    dir.position.set(2.8, 5.9, 4.8);
+    scene.add(dir);
+
+    const ambient = new THREE.AmbientLight(0x8aa4d8, 0.12);
+    scene.add(ambient);
+
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(WORLD_VISUALS.floorColor),
+      roughness: 0.985,
+      metalness: 0.02,
+      emissive: new THREE.Color(WORLD_VISUALS.floorEmissive),
+      emissiveIntensity: WORLD_VISUALS.floorEmissiveIntensity * 1.45,
+    });
+
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(320, 320), floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0;
+    scene.add(floor);
+
+    const stillnessTracker = createStillnessProtoTracker();
+    const stillnessField = createStillnessField();
+    scene.add(stillnessField.group);
+
+    const spacing = options?.layout?.spacing ?? 7.2;
+    const curveAmp = options?.layout?.curveAmp ?? 0.62;
+    const curveX = (index) => Math.sin(index * 0.72) * curveAmp;
+
+    const runtimeRooms = roomRegistry.map((room, index) => ({
+      ...room,
+      index,
+      x: room.x ?? curveX(index),
+      z: room.z ?? (1.2 - index * spacing),
+      preset: getRoomPreset(room.id),
+    }));
+
+    const zStart = runtimeRooms[0]?.z ?? 1.2;
+    const zEnd = runtimeRooms[runtimeRooms.length - 1]?.z ?? -21.4;
+    const midZ = (zStart + zEnd) * 0.5;
+
+    const environment = createEnvironmentShell({
+      scene,
+      stage: "sea",
+      works: [],
+      spacing,
+      zStart,
+      zEnd,
+      midZ,
+      curveX,
+      hazeBaseOpacity: WORLD_VISUALS.hazeBaseOpacity,
+    });
+
+    const interaction = createInteractionShell({ mount: host });
+    interaction.setDesktopHint("Click to enter · WASD move · click once for sound · V voice");
+    interaction.setDesktopHintVisible(true);
+    interaction.setVRHint("Look to focus · Trigger to teleport");
+    interaction.setVRHintVisible(false);
+
+    const runtimeState = createInitialWorldState();
+    const worldPos = new THREE.Vector3();
+    let unlockedPortalT = 0;
+
+    const syncWorldRoom = (room) => {
+      if (!room || !worldRuntime) return;
+
+      try {
+        if (typeof worldRuntime.recordRoomEntry === "function") {
+          worldRuntime.recordRoomEntry(room.id, "xr-room-focus");
+          return;
+        }
+
+        if (typeof worldRuntime.markVisited === "function") {
+          worldRuntime.markVisited(room.id);
+        }
+      } catch {}
+    };
+
+    const syncWorldPortal = (portalId) => {
+      if (!portalId || !worldRuntime) return;
+
+      try {
+        if (typeof worldRuntime.recordPortalUnlock === "function") {
+          worldRuntime.recordPortalUnlock(portalId, "xr-portal-proximity");
+          return;
+        }
+
+        if (typeof worldRuntime.openPortal === "function") {
+          worldRuntime.openPortal(portalId);
+        }
+      } catch {}
+    };
+
+    if (typeof window !== "undefined") {
+      window.__WHISPER_WORLD_BINDING__ = {
+        getCurrentRoomId: () => runtimeState.currentRoomId,
+        getUnlockedPortalIds: () => Array.from(runtimeState.unlockedPortalIds ?? []),
+        getMemoryMarks: () =>
+          worldRuntime && typeof worldRuntime.snapshot === "function"
+            ? worldRuntime.snapshot().state.memoryMarks
+            : [],
+      };
+    }
+
+let latestVoiceState = {
+      enabled: false,
+      active: false,
+      calibrating: false,
+      energy: 0,
+      brightness: 0,
+      onset: 0,
+      breath: 0,
+      presence: 0,
+      bloom: 0,
+      error: null,
+    };
+
+    let latestStillnessState = {
+      motionStillness: 0,
+      silence: 0,
+      stillness: 0,
+      settled: 0,
+    };
+
+    let activeStillRoom = runtimeRooms[0];
+    let activeStillProgress = 0;
+
+    const roomEntries = runtimeRooms.map((room) => {
+      const entry = buildRoomEntry(room);
+      const sculpture = createVoiceSculptureProto(room.id);
+      entry.group.add(sculpture.group);
+      entry.sculpture = sculpture;
+      scene.add(entry.group);
+      return entry;
+    });
+
+    const arrivalEntry = roomEntries.find((entry) => entry.room.id === "hall-of-arrival");
+
+    if (arrivalEntry?.elements?.celestialSky?.group) {
+      scene.add(arrivalEntry.elements.celestialSky.group);
+    }
+
+    const fallingStars =
+      arrivalEntry?.elements?.celestialSky?.layers?.anchor
+        ? createArrivalFallingStarsSystem()
+        : null;
+
+    if (fallingStars && arrivalEntry?.elements?.celestialSky?.layers?.anchor) {
+      arrivalEntry.elements.celestialSky.layers.anchor.add(fallingStars.group);
+    }
+
+    const constellationLoreEntry = getConstellationLoreEntry("great-bear-01");
+
+    const constellationOverlay = createConstellationLoreOverlay({ scene });
+
+    const constellationFocus =
+      arrivalEntry?.elements?.celestialSky
+        ? createConstellationFocusSystem({
+            camera,
+            skySystem: arrivalEntry.elements.celestialSky,
+            entry: constellationLoreEntry,
+          })
+        : null;
+
+    const constellationReveal =
+      arrivalEntry?.elements?.celestialSky
+        ? createConstellationRevealController({
+            scene,
+            camera,
+            skySystem: arrivalEntry.elements.celestialSky,
+            entry: constellationLoreEntry,
+            overlay: constellationOverlay,
+          })
+        : null;
+
+            const tryOpenConstellationLore = () => {
+      if (!constellationFocus || !constellationReveal) return false;
+      if (constellationReveal.isBusy() || constellationReveal.isOpen()) return false;
+
+      const snapshot = constellationFocus.getSnapshot();
+      if (!snapshot?.ready || !snapshot?.target) return false;
+
+      constellationReveal.open(snapshot.target);
+      constellationFocus.reset();
+      return true;
+    };
+
+    const tryCloseConstellationLore = () => {
+      if (!constellationReveal?.isOpen()) return false;
+      constellationReveal.close();
+      return true;
+    };
+
+    const onConstellationKeyDown = (event) => {
+      if (event.code === "KeyE") {
+        event.preventDefault();
+        if (tryCloseConstellationLore()) return;
+        tryOpenConstellationLore();
+      }
+
+      if (event.code === "Escape") {
+        event.preventDefault();
+        tryCloseConstellationLore();
+      }
+    };
+
+    const onConstellationPointerDown = () => {
+      if (tryCloseConstellationLore()) return;
+      tryOpenConstellationLore();
+    };
+
+    window.addEventListener("keydown", onConstellationKeyDown);
+    host.addEventListener("pointerdown", onConstellationPointerDown);
+
+    const xrLoreControllerA = renderer.xr.getController(0);
+    const xrLoreControllerB = renderer.xr.getController(1);
+
+    const onConstellationSelect = () => {
+      if (tryCloseConstellationLore()) return;
+      tryOpenConstellationLore();
+    };
+
+    xrLoreControllerA.addEventListener("selectstart", onConstellationSelect);
+    xrLoreControllerB.addEventListener("selectstart", onConstellationSelect);
+
+    scene.add(xrLoreControllerA);
+    scene.add(xrLoreControllerB);
+
+    const transitionFields = [];
+    for (let i = 0; i < runtimeRooms.length - 1; i += 1) {
+      const field = createTransitionField(runtimeRooms[i], runtimeRooms[i + 1]);
+      transitionFields.push(field);
+      scene.add(field);
+    }
+
+    const portalConfig = portalRegistry[0];
+    const finalRoom = runtimeRooms[runtimeRooms.length - 1];
+    const portalZ = (finalRoom?.z ?? -21.4) + (portalConfig?.zOffset ?? -4.2);
+
+    const gateCue = createGateCue({
+      scene,
+      dir,
+      hemi,
+      floorMat,
+      getBaseDirIntensity: () => 0.38,
+      getBaseHemiIntensity: () => 0.72,
+      getBaseFloorEmissive: () => WORLD_VISUALS.floorEmissiveIntensity,
+    });
+
+    gateCue.createAt({ x: 0, z: portalZ });
+    const gate = gateCue.getGate();
+    if (gate) gate.visible = true;
+
+    const portalGroup = new THREE.Group();
+    portalGroup.position.set(0, 0, portalZ);
+
+    const portalFloorRing = new THREE.Mesh(
+      new THREE.RingGeometry(1.12, 1.42, 72),
+      makeAdditiveMaterial(0xe4edff, 0.18)
+    );
+    portalFloorRing.rotation.x = -Math.PI / 2;
+    portalFloorRing.position.y = 0.03;
+    portalGroup.add(portalFloorRing);
+
+    const portalHalo = new THREE.Mesh(
+      new THREE.TorusGeometry(1.02, 0.03, 18, 120),
+      makeAdditiveMaterial(0xdce8ff, 0.24)
+    );
+    portalHalo.position.set(0, 1.84, 0);
+    portalGroup.add(portalHalo);
+
+    const portalCore = new THREE.Mesh(
+      new THREE.CircleGeometry(0.86, 72),
+      makeAdditiveMaterial(0xb2c8ff, 0.05)
+    );
+    portalCore.position.set(0, 1.84, -0.03);
+    portalGroup.add(portalCore);
+
+scene.add(portalGroup);
+
+    const portalInvocation = createPortalInvocationProto();
+    portalGroup.add(portalInvocation.group);
+
+    const locomotion = createLocomotionShell({
+      scene,
+      renderer,
+      camera,
+      rig,
+      floor,
+      snapTurnDeg: options?.locomotion?.snapTurnDeg ?? 30,
+      snapCooldownMs: options?.locomotion?.snapCooldownMs ?? 320,
+      markerColor: 0x9bbcff,
+    });
+
+    const handPresence = createHandPresenceSystem({
+      scene,
+      renderer,
+    });
+
+    const handVisualProxy = createHandVisualProxySystem({
+      handPresence,
+    });
+
+    const handContactReadiness = createHandContactReadinessSystem({
+      scene,
+      handPresence,
+    });
+
+    if (typeof window !== "undefined") {
+      window.__WHISPER_HANDS__ = handPresence;
+      window.__WHISPER_HAND_VISUALS__ = handVisualProxy;
+      window.__WHISPER_HAND_CONTACT__ = handContactReadiness;
+    }
+
+    const onResize = () => {
+      const w = Math.max(1, host.clientWidth);
+      const h = Math.max(1, host.clientHeight);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+
+    window.addEventListener("resize", onResize);
+
+    const clock = new THREE.Clock();
+
+    const setCurrentRoom = (room) => {
+      if (!room) return;
+
+      const changed = runtimeState.currentRoomId !== room.id;
+      runtimeState.currentRoomId = room.id;
+      runtimeState.visitedRoomIds.add(room.id);
+
+      if (changed) {
+        syncWorldRoom(room);
+      } else if (
+        worldRuntime &&
+        typeof worldRuntime.getCurrentRoom === "function" &&
+        worldRuntime.getCurrentRoom()?.id !== room.id
+      ) {
+        syncWorldRoom(room);
+      }
+    };
+
+    const updateArrival = (entry, elapsed, emphasis, voice) => {
+      const { celestialSky, groundRingA, groundRingB } = entry.elements;
+      const wave = 0.5 + Math.sin(elapsed * 0.72) * 0.5;
+
+      const shouldShowSky =
+        runtimeState.currentRoomId === entry.room.id ||
+        !runtimeState.currentRoomId ||
+        emphasis > 0.015;
+
+      celestialSky.setEnabled(shouldShowSky);
+
+      if (shouldShowSky) {
+        updateArrivalCelestialSkySystem(celestialSky, {
+          elapsed,
+          emphasis,
+          voice,
+          roomId: entry.room.id,
+          viewer: worldPos,
+        });
+      }
+
+      groundRingA.material.opacity =
+        0.012 +
+        wave * 0.01 +
+        emphasis * 0.012 +
+        voice.onset * 0.01;
+
+      groundRingB.material.opacity =
+        0.003 +
+        wave * 0.004 +
+        emphasis * 0.006 +
+        voice.bloom * 0.006;
+
+      entry.light.intensity =
+        0.10 +
+        emphasis * 0.08 +
+        voice.brightness * 0.03 +
+        voice.bloom * 0.02;
+    };
+
+    const updateSignal = (entry, elapsed, emphasis, voice) => {
+      const { rods, waveRing, floorTrace } = entry.elements;
+      rods.forEach((rod, i) => {
+        const wave = 0.5 + Math.sin(elapsed * 2.25 + i * 0.48) * 0.5;
+        rod.position.y = 1.05 + wave * 0.64 + voice.presence * 0.22 + voice.onset * 0.1;
+        rod.material.opacity = 0.04 + wave * 0.14 + emphasis * 0.07 + voice.onset * 0.06 + voice.brightness * 0.04;
+      });
+
+      waveRing.rotation.z += 0.012 + voice.onset * 0.01;
+      waveRing.scale.setScalar(1 + voice.presence * 0.1 + voice.bloom * 0.06);
+      waveRing.material.opacity = 0.04 + emphasis * 0.08 + Math.sin(elapsed * 1.8) * 0.02 + voice.brightness * 0.06;
+
+      floorTrace.material.opacity = 0.05 + emphasis * 0.07 + Math.sin(elapsed * 1.5) * 0.02 + voice.onset * 0.04;
+    };
+
+    const updateMembrane = (entry, elapsed, emphasis, voice) => {
+      const { membraneCore, membraneAura, veils, floorRing } = entry.elements;
+
+      const readiness = membraneCore.userData?.__handReadiness ?? null;
+      const handProximity = readiness?.aggregateProximity ?? 0;
+      const handContact = readiness?.aggregateContact ?? 0;
+      const dwellMs = readiness?.dwellMs ?? 0;
+      const dwellT = Math.min(1, dwellMs / 1400);
+      const coherence = readiness?.coherence ?? 0;
+      const bothHands = readiness?.bothHandsActive ? 1 : 0;
+
+      const leftProx = readiness?.hands?.left?.proximityIntensity ?? 0;
+      const rightProx = readiness?.hands?.right?.proximityIntensity ?? 0;
+      const leftContact = readiness?.hands?.left?.contactIntensity ?? 0;
+      const rightContact = readiness?.hands?.right?.contactIntensity ?? 0;
+
+      const directionalBias =
+        (rightProx + rightContact * 0.85) -
+        (leftProx + leftContact * 0.85);
+
+      const handCharge =
+        handProximity * 0.34 +
+        handContact * 0.88 +
+        dwellT * 0.42 +
+        coherence * 0.34 +
+        bothHands * 0.14;
+
+      const directedLift =
+        handProximity * 0.12 +
+        handContact * 0.18 +
+        dwellT * 0.14 +
+        coherence * 0.10;
+
+      membraneCore.position.x = directionalBias * 0.11;
+      membraneAura.position.x = directionalBias * 0.14;
+
+      const sx =
+        1 +
+        Math.sin(elapsed * 1.1) * 0.08 +
+        emphasis * 0.14 +
+        voice.presence * 0.18 +
+        handProximity * 0.10 +
+        handContact * 0.18 +
+        bothHands * 0.08 +
+        coherence * 0.06;
+
+      const sy =
+        1 +
+        Math.cos(elapsed * 1.42) * 0.16 +
+        emphasis * 0.18 +
+        voice.breath * 0.18 +
+        voice.bloom * 0.08 +
+        handProximity * 0.14 +
+        handContact * 0.24 +
+        dwellT * 0.18 +
+        coherence * 0.12 +
+        bothHands * 0.08;
+
+      const sz =
+        1 +
+        Math.sin(elapsed * 0.9 + 0.7) * 0.09 +
+        emphasis * 0.14 +
+        voice.presence * 0.14 +
+        handProximity * 0.10 +
+        handContact * 0.16 +
+        coherence * 0.08;
+
+      membraneCore.scale.set(sx, sy, sz);
+      membraneCore.material.opacity =
+        0.04 +
+        emphasis * 0.08 +
+        Math.sin(elapsed * 1.3) * 0.02 +
+        voice.presence * 0.08 +
+        voice.bloom * 0.04 +
+        handProximity * 0.08 +
+        handContact * 0.12 +
+        dwellT * 0.08 +
+        coherence * 0.05;
+
+      const auraScale =
+        1 +
+        Math.sin(elapsed * 0.86) * 0.05 +
+        emphasis * 0.12 +
+        voice.brightness * 0.14 +
+        voice.bloom * 0.08 +
+        handProximity * 0.12 +
+        handContact * 0.18 +
+        dwellT * 0.16 +
+        coherence * 0.10 +
+        bothHands * 0.06;
+
+      membraneAura.scale.setScalar(auraScale);
+      membraneAura.rotation.y += 0.005 + voice.onset * 0.008 + handCharge * 0.006;
+      membraneAura.rotation.z = directionalBias * 0.22;
+      membraneAura.material.opacity =
+        0.03 +
+        emphasis * 0.05 +
+        Math.sin(elapsed * 1.1) * 0.02 +
+        voice.brightness * 0.06 +
+        handProximity * 0.06 +
+        handContact * 0.10 +
+        dwellT * 0.08 +
+        coherence * 0.04;
+
+      veils.forEach((veil, i) => {
+        const centralBoost = i === 1 ? 1 : 0.64;
+        const sideLift = i === 1 ? directionalBias * 0.08 : directionalBias * 0.05;
+
+        veil.position.x = sideLift;
+        veil.position.y =
+          1.9 +
+          Math.sin(elapsed * 1.2 + i * 0.8) * 0.1 +
+          voice.breath * 0.08 +
+          handProximity * 0.05 * centralBoost +
+          handContact * 0.08 * centralBoost +
+          dwellT * 0.06 * centralBoost +
+          coherence * 0.04 * centralBoost;
+
+        veil.material.opacity =
+          0.03 +
+          emphasis * 0.04 +
+          (i === 1 ? 0.03 : 0) +
+          voice.presence * 0.04 +
+          handProximity * 0.04 * centralBoost +
+          handContact * 0.06 * centralBoost +
+          dwellT * 0.04 * centralBoost +
+          coherence * 0.03 * centralBoost;
+      });
+
+      floorRing.material.opacity =
+        0.04 +
+        emphasis * 0.07 +
+        Math.sin(elapsed * 1.4) * 0.02 +
+        voice.onset * 0.03 +
+        voice.bloom * 0.03 +
+        handProximity * 0.04 +
+        handContact * 0.07 +
+        dwellT * 0.05 +
+        coherence * 0.03;
+
+      floorRing.scale.setScalar(
+        1 +
+        handProximity * 0.04 +
+        handContact * 0.07 +
+        dwellT * 0.05 +
+        coherence * 0.03
+      );
+
+      entry.light.intensity =
+        0.24 +
+        emphasis * 0.16 +
+        voice.presence * 0.08 +
+        voice.bloom * 0.04 +
+        handProximity * 0.10 +
+        handContact * 0.16 +
+        dwellT * 0.10 +
+        coherence * 0.06 +
+        bothHands * 0.05;
+
+      entry.light.position.x = directionalBias * 0.26;
+      entry.light.position.y = 2.4 + directedLift * 0.34;
+    };
+
+    const updatePortalRoom = (entry, elapsed, emphasis, voice) => {
+      const { archOuter, archInner, membrane, pylons, floorRing } = entry.elements;
+
+      const invocationDamp = clamp01(
+        (voice.presence * 0.4 + voice.bloom * 0.28 + unlockedPortalT * 0.42) * emphasis
+      );
+
+      entry.shell.material.opacity = Math.max(
+        0.014,
+        entry.room.preset.shellOpacity + emphasis * 0.028 - invocationDamp * 0.045
+      );
+
+      entry.light.intensity =
+        0.08 +
+        emphasis * 0.12 +
+        unlockedPortalT * 0.08 +
+        voice.brightness * 0.03 +
+        voice.bloom * 0.02;
+
+      archOuter.rotation.z += 0.009 + voice.onset * 0.006;
+      archOuter.material.opacity =
+        0.07 +
+        emphasis * 0.08 +
+        unlockedPortalT * 0.08 +
+        voice.brightness * 0.035 +
+        voice.bloom * 0.025;
+
+      archInner.rotation.z -= 0.014 + voice.breath * 0.004;
+      archInner.material.opacity =
+        0.04 +
+        emphasis * 0.07 +
+        unlockedPortalT * 0.09 +
+        voice.presence * 0.035;
+
+      const membraneScale =
+        1 +
+        Math.sin(elapsed * 1.65) * 0.04 +
+        emphasis * 0.06 +
+        unlockedPortalT * 0.08 +
+        voice.presence * 0.06 +
+        voice.bloom * 0.03;
+
+      membrane.scale.setScalar(membraneScale);
+      membrane.material.opacity =
+        0.014 +
+        emphasis * 0.03 +
+        unlockedPortalT * 0.08 +
+        voice.brightness * 0.035;
+
+      pylons.forEach((pylon, i) => {
+        const wave = 0.5 + Math.sin(elapsed * 1.9 + i * 0.9) * 0.5;
+        pylon.material.opacity =
+          0.025 +
+          wave * 0.03 +
+          emphasis * 0.03 +
+          unlockedPortalT * 0.04 +
+          voice.onset * 0.025;
+      });
+
+      floorRing.material.opacity =
+        0.03 +
+        emphasis * 0.05 +
+        unlockedPortalT * 0.05 +
+        voice.brightness * 0.02;
+    };
+    const updateRooms = (elapsed, voice) => {
+      camera.getWorldPosition(worldPos);
+
+      let nearest = null;
+      let nearestDist = Infinity;
+      const distances = new Map();
+
+      roomEntries.forEach((entry) => {
+        const dx = worldPos.x - entry.room.x;
+        const dz = worldPos.z - entry.room.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+
+        distances.set(entry.room.id, dist);
+
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = entry;
+        }
+      });
+
+      const focusedProgress = nearest ? 1 - clamp01(nearestDist / 4.8) : 0;
+
+      roomEntries.forEach((entry, index) => {
+        const dist = distances.get(entry.room.id) ?? 999;
+        const emphasis = clamp01(1 - dist / 5.6);
+        const drift = Math.sin(elapsed * 0.42 + index * 0.7) * 0.04;
+        const voiceInfluence = emphasis * voice.presence;
+        const bloomInfluence = emphasis * voice.bloom;
+        const focusBoost = nearest && nearest.room.id === entry.room.id
+          ? focusedProgress
+          : emphasis * 0.16;
+
+        const orderDelta = nearest ? entry.room.index - nearest.room.index : 0;
+        const absOrderDelta = Math.abs(orderDelta);
+
+        const revealWeight = nearest
+          ? absOrderDelta === 0
+            ? 1
+            : absOrderDelta === 1
+              ? 0.42
+              : absOrderDelta === 2
+                ? 0.16
+                : 0.08
+          : 1;
+
+        const distanceFade = clamp01(1 - dist / 18.5);
+        const shellReveal = revealWeight * (0.45 + distanceFade * 0.55);
+        const lightReveal = 0.28 + revealWeight * 0.72;
+        const sculptureReveal = 0.36 + revealWeight * 0.64;
+
+        entry.group.position.y = drift * (0.65 + revealWeight * 0.35);
+
+        entry.shell.material.opacity =
+          (
+            entry.room.preset.shellOpacity * 0.42 +
+            emphasis * 0.048 +
+            voiceInfluence * 0.022 +
+            bloomInfluence * 0.01
+          ) * shellReveal;
+
+        entry.light.intensity =
+          (
+            0.08 +
+            emphasis * 0.22 +
+            Math.sin(elapsed * 1.1 + index * 0.5) * 0.04 +
+            voiceInfluence * 0.16 +
+            bloomInfluence * 0.06
+          ) * lightReveal;
+
+        if (entry.room.id === "hall-of-arrival") updateArrival(entry, elapsed, emphasis, voice);
+        if (entry.room.id === "signal-corridor") updateSignal(entry, elapsed, emphasis, voice);
+        if (entry.room.id === "membrane-chamber") updateMembrane(entry, elapsed, emphasis, voice);
+        if (entry.room.id === "portal-atrium") updatePortalRoom(entry, elapsed, emphasis, voice);
+
+        updateVoiceSculptureProto(entry.sculpture, {
+          elapsed,
+          voice,
+          focus: focusBoost * sculptureReveal,
+          portalUnlock: unlockedPortalT,
+        });
+      });
+
+      transitionFields.forEach((field, index) => {
+        const dx = worldPos.x - field.position.x;
+        const dz = worldPos.z - field.position.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        const emphasis = clamp01(1 - dist / 6.4);
+
+        const nearestIndex = nearest?.room.index ?? 0;
+        const fieldDelta = Math.abs(index - nearestIndex);
+        const transitionReveal =
+          fieldDelta === 0
+            ? 0.68
+            : fieldDelta === 1
+              ? 0.22
+              : 0.08;
+
+        field.position.y = Math.sin(elapsed * 0.36 + index * 0.6) * 0.06;
+
+        field.children.forEach((child, childIndex) => {
+          if (!child.material) return;
+
+          child.material.opacity =
+            (
+              0.012 +
+              emphasis * 0.04 +
+              Math.sin(elapsed * 1.2 + childIndex) * 0.008 +
+              voice.bloom * 0.015
+            ) * transitionReveal;
+
+          if (child.geometry?.type === "TorusGeometry") {
+            child.rotation.z += 0.004 + voice.onset * 0.004;
+          }
+        });
+      });
+
+      scene.fog.density =
+        WORLD_VISUALS.fogDensity +
+        voice.presence * 0.002 +
+        voice.bloom * 0.0015 -
+        latestStillnessState.stillness * 0.0016;
+
+      renderer.toneMappingExposure =
+        0.92 +
+        voice.bloom * 0.035 -
+        latestStillnessState.stillness * 0.028;
+
+      if (!nearest) return;
+
+      setCurrentRoom(nearest.room);
+
+      const progress = focusedProgress;
+      const boundRoom =
+        worldRuntime && typeof worldRuntime.getCurrentRoom === "function"
+          ? worldRuntime.getCurrentRoom() ?? nearest.room
+          : nearest.room;
+
+      interaction.setRail({
+        pid: boundRoom.label ?? nearest.room.label,
+        caption: boundRoom.caption ?? nearest.room.caption,
+        visible: true,
+        hintOpacity: 0.86,
+      });
+      interaction.setMeterProgress(progress);
+
+activeStillRoom = nearest.room;
+      activeStillProgress = progress;
+
+      ritualSound.setRoomState(nearest.room.id, progress);
+    };
+
+    const updatePortal = (elapsed, dtSec, dtMs, voice) => {
+      camera.getWorldPosition(worldPos);
+
+      const dx = worldPos.x;
+      const dz = worldPos.z - portalZ;
+      const portalDist = Math.sqrt(dx * dx + dz * dz);
+
+      if (portalDist < 3.8) {
+        runtimeState.unlockedPortalIds.add(portalConfig.id);
+        syncWorldPortal(portalConfig.id);
+        gateCue.trigger();
+      }
+
+      const targetUnlock = runtimeState.unlockedPortalIds.has(portalConfig.id) ? 1 : 0;
+      unlockedPortalT = lerp(unlockedPortalT, targetUnlock, clamp01(dtSec * 1.6));
+
+      const portalNearness = 1 - clamp01(portalDist / 5.2);
+      const portalVoiceLift =
+        voice.presence * portalNearness * 0.16 +
+        voice.bloom * portalNearness * 0.12 +
+        voice.brightness * portalNearness * 0.08;
+
+      ritualSound.setPortalPresence(
+        Math.max(
+          unlockedPortalT * 0.42,
+          portalNearness * (0.18 + unlockedPortalT * 0.58) + portalVoiceLift
+        )
+      );
+
+      portalFloorRing.material.opacity =
+        0.035 +
+        unlockedPortalT * 0.1 +
+        Math.sin(elapsed * 1.4) * 0.012 +
+        voice.onset * 0.01;
+
+      portalHalo.rotation.z += dtMs * 0.00012 + voice.onset * 0.002;
+      portalHalo.scale.setScalar(
+        1 +
+        unlockedPortalT * 0.04 +
+        voice.bloom * 0.025
+      );
+      portalHalo.material.opacity =
+        0.04 +
+        unlockedPortalT * 0.12 +
+        Math.sin(elapsed * 1.8) * 0.02 +
+        voice.brightness * 0.025 +
+        voice.bloom * 0.02;
+
+      portalCore.scale.setScalar(
+        0.84 +
+        unlockedPortalT * 0.12 +
+        voice.presence * 0.05 +
+        voice.bloom * 0.03
+      );
+      portalCore.material.opacity =
+        0.014 +
+        unlockedPortalT * 0.08 +
+        Math.sin(elapsed * 1.1) * 0.01 +
+        voice.brightness * 0.025;
+
+      updatePortalInvocationProto(portalInvocation, {
+        elapsed,
+        voice,
+        focus: portalNearness,
+        unlocked: unlockedPortalT,
+      });
+
+      gateCue.update(dtMs);
+    };    renderer.setAnimationLoop(() => {
+      const dtSec = clock.getDelta();
+      const dtMs = dtSec * 1000;
+      const elapsed = clock.elapsedTime;
+      const nowMs = performance.now();
+
+      latestVoiceState = voiceSeed.update();
+      updateVoiceBadge(latestVoiceState);
+
+      locomotion.updateTeleport();
+      locomotion.updateDesktopMove(dtSec);
+      locomotion.updateSnapTurn(nowMs);
+
+updateRooms(elapsed, latestVoiceState);
+      updatePortal(elapsed, dtSec, dtMs, latestVoiceState);
+
+      if (fallingStars) {
+        fallingStars.update({
+          dtSec,
+          enabled: runtimeState.currentRoomId === "hall-of-arrival",
+          intensity: latestVoiceState?.brightness ?? 0,
+        });
+      }
+
+      if (constellationFocus) {
+        const focusSnapshot = constellationFocus.update({ dtMs });
+
+        constellationOverlay.setPromptState({
+          visible: focusSnapshot.visible && !constellationReveal?.isOpen(),
+          label: focusSnapshot.label,
+          progress: focusSnapshot.progress,
+          worldPosition: focusSnapshot.promptWorldPosition,
+        });
+      }
+
+      if (constellationReveal) {
+        constellationReveal.update({ dtMs });
+      }
+
+      constellationOverlay.update({
+        camera,
+        dtMs,
+      });
+
+      latestStillnessState = stillnessTracker.update({
+        camera,
+        dtSec,
+        voice: latestVoiceState,
+      });
+
+      updateStillnessField(stillnessField, {
+        elapsed,
+        room: activeStillRoom,
+        stillness: latestStillnessState.stillness,
+        settled: latestStillnessState.settled,
+        progress: activeStillProgress,
+      });
+
+      ritualSound.setVoiceFeatures(latestVoiceState);
+      ritualSound.update(elapsed);
+
+      interaction.setVRHintVisible(Boolean(xrChecked && xrSupported && renderer.xr.isPresenting));
+      interaction.setDesktopHintVisible(!renderer.xr.isPresenting);
+
+      handPresence.update({
+        currentRoomId: runtimeState.currentRoomId,
+      });
+
+      handContactReadiness.update({
+        currentRoomId: runtimeState.currentRoomId,
+        timeMs: performance.now(),
+      });
+
+      handVisualProxy.update({
+        currentRoomId: runtimeState.currentRoomId,
+        timeMs: performance.now(),
+      });
+
+      renderer.render(scene, camera);
+    });
+
+    return () => {
+      renderer.setAnimationLoop(null);
+
+      try { host.removeEventListener("click", onHostClick); } catch {}
+      try { voiceBadge.removeEventListener("click", toggleVoice); } catch {}
+      try { window.removeEventListener("keydown", onKeyDown); } catch {}
+      try { window.removeEventListener("resize", onResize); } catch {}
+      try { pointerLock.disconnect(); } catch {}
+
+      try { locomotion.dispose(); } catch {}
+      try { handContactReadiness.dispose(); } catch {}
+      try { handVisualProxy.dispose(); } catch {}
+      try { handPresence.dispose(); } catch {}
+      try {
+        if (typeof window !== "undefined") {
+          delete window.__WHISPER_HANDS__;
+          delete window.__WHISPER_HAND_VISUALS__;
+          delete window.__WHISPER_HAND_CONTACT__;
+        }
+      } catch {}
+      try { interaction.dispose(); } catch {}
+      try { gateCue.dispose(); } catch {}
+      try { environment.dispose(); } catch {}
+      try { ritualSound.dispose(); } catch {}
+      try { voiceSeed.dispose(); } catch {}
+
+      try {
+        disposeObjectTree(portalGroup);
+        scene.remove(portalGroup);
+      } catch {}
+
+      transitionFields.forEach((field) => {
+        try {
+          disposeObjectTree(field);
+          scene.remove(field);
+        } catch {}
+      });
+
+      roomEntries.forEach((entry) => {
+        try {
+          if (entry.room.id === "hall-of-arrival" && entry.elements?.celestialSky) {
+            disposeArrivalCelestialSkySystem(entry.elements.celestialSky);
+          }
+        } catch {}
+
+        try {
+          disposeObjectTree(entry.group);
+          scene.remove(entry.group);
+        } catch {}
+      });
+
+      try {
+        disposeObjectTree(stillnessField.group);
+        scene.remove(stillnessField.group);
+      } catch {}
+
+      try { stillnessTracker.dispose(); } catch {}
+
+      try {
+        floor.geometry.dispose();
+        disposeMaterial(floor.material);
+        scene.remove(floor);
+      } catch {}
+
+      try {
+        renderer.dispose();
+      } catch {}
+
+      try {
+        vrButton.remove();
+      } catch {}
+
+      try {
+        voiceBadge.remove();
+      } catch {}
+
+      try { window.removeEventListener("keydown", onConstellationKeyDown); } catch {}
+      try { host.removeEventListener("pointerdown", onConstellationPointerDown); } catch {}
+
+      try { xrLoreControllerA.removeEventListener("selectstart", onConstellationSelect); } catch {}
+      try { xrLoreControllerB.removeEventListener("selectstart", onConstellationSelect); } catch {}
+
+      try { constellationReveal?.dispose(); } catch {}
+      try { constellationOverlay?.dispose(); } catch {}
+      try { fallingStars?.dispose?.(); } catch {}
+
+      try {
+        host.innerHTML = "";
+      } catch {}
+    };
+  }, [manifest, options, xrSupported, xrChecked]);
+
+  return <div ref={hostRef} style={{ width: "100%", height: "100%" }} />;
+}
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,409 @@
+﻿import * as THREE from "three";
+import { createHandStateModel } from "./createHandStateModel.js";
+
+const JOINT_NAMES = {
+  thumb: "thumb-tip",
+  index: "index-finger-tip",
+  middle: "middle-finger-tip",
+  ring: "ring-finger-tip",
+  pinky: "pinky-finger-tip",
+};
+
+const PALM_JOINT_CANDIDATES = [
+  "wrist",
+  "middle-finger-metacarpal",
+  "index-finger-metacarpal",
+];
+
+const SOURCE_PRIORITY = {
+  "none": 0,
+  "controller-ray": 1,
+  "controller-grip": 2,
+  "hand-tracking": 3,
+};
+
+const ROOM_RESPONSE_MAP = {
+  "hall-of-arrival": 0.34,
+  "signal-corridor": 0.56,
+  "membrane-chamber": 0.82,
+  "portal-atrium": 1,
+};
+
+const _position = new THREE.Vector3();
+const _quaternion = new THREE.Quaternion();
+const _scale = new THREE.Vector3();
+const _forward = new THREE.Vector3();
+
+function toArrayVec3(v) {
+  return [v.x, v.y, v.z];
+}
+
+function toArrayQuat(q) {
+  return [q.x, q.y, q.z, q.w];
+}
+
+function getWorldPose(object3D) {
+  object3D.updateMatrixWorld(true);
+  object3D.matrixWorld.decompose(_position, _quaternion, _scale);
+
+  return {
+    position: toArrayVec3(_position),
+    quaternion: toArrayQuat(_quaternion),
+    scale: toArrayVec3(_scale),
+  };
+}
+
+function getPalmData(object3D) {
+  object3D.updateMatrixWorld(true);
+  object3D.matrixWorld.decompose(_position, _quaternion, _scale);
+
+  _forward.set(0, 0, -1).applyQuaternion(_quaternion).normalize();
+
+  return {
+    position: toArrayVec3(_position),
+    normal: toArrayVec3(_forward),
+  };
+}
+
+function copyWorldTransform(source, target) {
+  source.updateMatrixWorld(true);
+  source.matrixWorld.decompose(_position, _quaternion, _scale);
+
+  target.position.copy(_position);
+  target.quaternion.copy(_quaternion);
+  target.scale.copy(_scale);
+  target.visible = true;
+}
+
+function clearMount(mount) {
+  mount.root.visible = false;
+  mount.visualRoot.visible = false;
+  mount.palmAnchor.visible = false;
+
+  Object.values(mount.fingertipAnchors).forEach((anchor) => {
+    anchor.visible = false;
+  });
+}
+
+function createHandMount(side) {
+  const root = new THREE.Group();
+  root.name = `${side}-hand-mount`;
+  root.visible = false;
+
+  const visualRoot = new THREE.Group();
+  visualRoot.name = `${side}-hand-visual-root`;
+  visualRoot.visible = false;
+  root.add(visualRoot);
+
+  const palmAnchor = new THREE.Group();
+  palmAnchor.name = `${side}-palm-anchor`;
+  palmAnchor.visible = false;
+  root.add(palmAnchor);
+
+  const fingertipAnchors = {};
+  Object.keys(JOINT_NAMES).forEach((fingerKey) => {
+    const anchor = new THREE.Group();
+    anchor.name = `${side}-${fingerKey}-tip-anchor`;
+    anchor.visible = false;
+    root.add(anchor);
+    fingertipAnchors[fingerKey] = anchor;
+  });
+
+  return {
+    root,
+    visualRoot,
+    palmAnchor,
+    fingertipAnchors,
+  };
+}
+
+function createTrackedSpaces(renderer) {
+  return [0, 1].map((index) => {
+    const controller = renderer.xr.getController(index);
+    controller.name = `xr-controller-${index}`;
+    controller.visible = false;
+
+    const grip = renderer.xr.getControllerGrip(index);
+    grip.name = `xr-controller-grip-${index}`;
+    grip.visible = false;
+
+    const hand = renderer.xr.getHand(index);
+    hand.name = `xr-hand-${index}`;
+    hand.visible = false;
+
+    return { index, controller, grip, hand };
+  });
+}
+
+function getSourceType(inputSource) {
+  if (inputSource?.hand) return "hand-tracking";
+  if (inputSource?.gripSpace) return "controller-grip";
+  if (inputSource?.targetRaySpace) return "controller-ray";
+  return "none";
+}
+
+function pickBetterSource(current, next) {
+  if (!current) return next;
+  return SOURCE_PRIORITY[next.sourceType] > SOURCE_PRIORITY[current.sourceType]
+    ? next
+    : current;
+}
+
+function getButtons(inputSource) {
+  const buttons = inputSource?.gamepad?.buttons ?? [];
+
+  return {
+    trigger: buttons[0]?.value ?? 0,
+    squeeze: buttons[1]?.value ?? 0,
+  };
+}
+
+function getWorldResponseMultiplier(roomId) {
+  return ROOM_RESPONSE_MAP[roomId] ?? 0.62;
+}
+
+function getTrackedObjectForSource(spaceSet, inputSource) {
+  const sourceType = getSourceType(inputSource);
+
+  if (sourceType === "hand-tracking") return spaceSet.hand;
+  if (sourceType === "controller-grip") return spaceSet.grip;
+  if (sourceType === "controller-ray") return spaceSet.controller;
+  return null;
+}
+
+function getHandAnchorObject(handObject) {
+  for (const jointName of PALM_JOINT_CANDIDATES) {
+    const joint = handObject?.joints?.[jointName] ?? null;
+    if (joint) return joint;
+  }
+
+  return handObject ?? null;
+}
+
+function extractFingertips(handObject, mount) {
+  const fingertips = {};
+
+  Object.entries(JOINT_NAMES).forEach(([fingerKey, jointName]) => {
+    const joint = handObject?.joints?.[jointName] ?? null;
+
+    if (!joint) {
+      fingertips[fingerKey] = null;
+      mount.fingertipAnchors[fingerKey].visible = false;
+      return;
+    }
+
+    copyWorldTransform(joint, mount.fingertipAnchors[fingerKey]);
+    fingertips[fingerKey] = getWorldPose(joint).position;
+  });
+
+  return fingertips;
+}
+
+function getGesture({ sourceType, trigger, squeeze, pinch }) {
+  if (sourceType === "none") return "hidden";
+  if (pinch > 0.7) return "invoke";
+  if (squeeze > 0.55) return "hold";
+  if (trigger > 0.15) return "hover";
+  return "idle";
+}
+
+export function createHandPresenceSystem({
+  scene,
+  renderer,
+  rigParent = scene,
+}) {
+  const handState = createHandStateModel();
+
+  const mountRoot = new THREE.Group();
+  mountRoot.name = "hand-presence-mount-root";
+  rigParent.add(mountRoot);
+
+  const mounts = {
+    left: createHandMount("left"),
+    right: createHandMount("right"),
+  };
+
+  mountRoot.add(mounts.left.root);
+  mountRoot.add(mounts.right.root);
+
+  const trackedSpaces = createTrackedSpaces(renderer);
+  trackedSpaces.forEach((spaceSet) => {
+    rigParent.add(spaceSet.controller);
+    rigParent.add(spaceSet.grip);
+    rigParent.add(spaceSet.hand);
+  });
+
+  const update = ({
+    currentRoomId = "",
+  } = {}) => {
+    const presenting = Boolean(renderer.xr.isPresenting);
+    handState.beginFrame({ presenting });
+
+    clearMount(mounts.left);
+    clearMount(mounts.right);
+
+    if (!presenting) {
+      return;
+    }
+
+    const session = renderer.xr.getSession?.();
+    if (!session) {
+      return;
+    }
+
+    const chosen = {
+      left: null,
+      right: null,
+    };
+
+    const sessionInputs = Array.from(session.inputSources ?? []);
+    const hasAnyTrackedHand = sessionInputs.some(
+      (inputSource) => getSourceType(inputSource) === "hand-tracking"
+    );
+
+    sessionInputs.forEach((inputSource, index) => {
+      const side = inputSource?.handedness;
+      if (side !== "left" && side !== "right") return;
+
+      const sourceType = getSourceType(inputSource);
+
+      if (hasAnyTrackedHand && sourceType !== "hand-tracking") {
+        return;
+      }
+
+      chosen[side] = pickBetterSource(chosen[side], {
+        index,
+        inputSource,
+        sourceType,
+      });
+    });
+
+    ["left", "right"].forEach((side) => {
+      const resolved = chosen[side];
+      const worldResponseMultiplier = getWorldResponseMultiplier(currentRoomId);
+
+      if (!resolved) {
+        handState.applySide(side, {
+          presenting,
+          worldResponseMultiplier,
+        });
+        return;
+      }
+
+      const spaceSet = trackedSpaces[resolved.index];
+      const sourceObject = getTrackedObjectForSource(spaceSet, resolved.inputSource);
+
+      if (!sourceObject) {
+        handState.applySide(side, {
+          presenting,
+          worldResponseMultiplier,
+        });
+        return;
+      }
+
+      const trackedAnchorObject =
+        resolved.sourceType === "hand-tracking"
+          ? getHandAnchorObject(sourceObject)
+          : sourceObject;
+
+      const mount = mounts[side];
+      copyWorldTransform(trackedAnchorObject, mount.root);
+      copyWorldTransform(trackedAnchorObject, mount.palmAnchor);
+
+      mount.root.visible = true;
+      mount.visualRoot.visible = true;
+      mount.palmAnchor.visible = true;
+
+      const buttons = getButtons(resolved.inputSource);
+
+      const pinch =
+        resolved.sourceType === "hand-tracking"
+          ? (sourceObject?.inputState?.pinching ? 1 : 0)
+          : buttons.trigger;
+
+      const fingertips =
+        resolved.sourceType === "hand-tracking"
+          ? extractFingertips(sourceObject, mount)
+          : {
+              thumb: null,
+              index: null,
+              middle: null,
+              ring: null,
+              pinky: null,
+            };
+
+      handState.applySide(side, {
+        connected: true,
+        visible: true,
+        presenting: true,
+        source: resolved.sourceType,
+        sourceIndex: resolved.index,
+        pose: getWorldPose(trackedAnchorObject),
+        palm: getPalmData(trackedAnchorObject),
+        fingertips,
+        trigger: buttons.trigger,
+        squeeze: buttons.squeeze,
+        pinch,
+        confidence: resolved.sourceType === "hand-tracking" ? 1 : 0.84,
+        gesture: getGesture({
+          sourceType: resolved.sourceType,
+          trigger: buttons.trigger,
+          squeeze: buttons.squeeze,
+          pinch,
+        }),
+        visibilityWeight: 1,
+        proximityIntensity: 0,
+        contactIntensity: 0,
+        ritualCharge: 0,
+        worldResponseMultiplier,
+      });
+    });
+  };
+
+  const getMount = (side) => mounts[side];
+  const getSide = (side) => handState.getSide(side);
+  const snapshot = () => handState.snapshot();
+
+  const getDebugSnapshot = () => {
+    const session = renderer.xr.getSession?.();
+
+    return {
+      ...handState.snapshot(),
+      xrPresenting: Boolean(renderer.xr.isPresenting),
+      sessionInputs: Array.from(session?.inputSources ?? []).map((inputSource, index) => ({
+        index,
+        handedness: inputSource?.handedness ?? "none",
+        sourceType: getSourceType(inputSource),
+      })),
+    };
+  };
+
+  const dispose = () => {
+    try { mountRoot.removeFromParent(); } catch {}
+
+    trackedSpaces.forEach((spaceSet) => {
+      try { spaceSet.controller.removeFromParent(); } catch {}
+      try { spaceSet.grip.removeFromParent(); } catch {}
+      try { spaceSet.hand.removeFromParent(); } catch {}
+    });
+  };
+
+  return {
+    root: mountRoot,
+    state: handState.state,
+    update,
+    getMount,
+    getSide,
+    snapshot,
+    getDebugSnapshot,
+    dispose,
+  };
+}
+
+
+
+
+
+
+
+

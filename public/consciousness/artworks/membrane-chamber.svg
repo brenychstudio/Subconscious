@@ -1,0 +1,17 @@
+﻿<svg width="1200" height="1600" viewBox="0 0 1200 1600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="1600" fill="#04060A"/>
+  <ellipse cx="600" cy="790" rx="330" ry="450" fill="url(#g1)" fill-opacity="0.82"/>
+  <ellipse cx="600" cy="790" rx="390" ry="520" stroke="#CFE0FF" stroke-opacity="0.22" stroke-width="2"/>
+  <ellipse cx="600" cy="790" rx="470" ry="620" stroke="#E5EEFF" stroke-opacity="0.08" stroke-width="2"/>
+  <path d="M360 490C470 610 730 610 840 490" stroke="#EEF4FF" stroke-opacity="0.16" stroke-width="2"/>
+  <path d="M330 690C460 790 740 790 870 690" stroke="#A8C4FF" stroke-opacity="0.18" stroke-width="2"/>
+  <path d="M320 960C470 1060 730 1060 880 960" stroke="#EAF2FF" stroke-opacity="0.12" stroke-width="2"/>
+  <text x="600" y="1360" text-anchor="middle" fill="#E6EEFF" fill-opacity="0.88" font-family="Arial, Helvetica, sans-serif" font-size="56" letter-spacing="10">MEMBRANE CHAMBER</text>
+  <defs>
+    <radialGradient id="g1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 790) rotate(90) scale(520)">
+      <stop stop-color="#F0F6FF" stop-opacity="0.86"/>
+      <stop offset="0.4" stop-color="#9EC2FF" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#0A1020" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>

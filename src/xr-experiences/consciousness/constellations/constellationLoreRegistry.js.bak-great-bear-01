@@ -1,0 +1,32 @@
+﻿export const CONSTELLATION_LORE_REGISTRY = [
+  {
+    id: "arrival-auto-01",
+    selector: "largest-visible-component",
+
+    promptLabel: "Attune constellation",
+    promptReadyLabel: "Invoke constellation",
+
+    dwellMs: 1100,
+    focusAngleDeg: 4.8,
+    focusReleaseDeg: 7.2,
+
+    revealDistance: 2.6,
+    revealLift: 0.10,
+    revealSide: 0.92,
+    revealScale: 1.85,
+
+    title: "Celestial Archive I",
+    body: [
+      "A first threshold constellation: not a museum label, but a living fragment of sky invited into presence.",
+      "In the logic of this world, constellations are not background decoration. They are memory-structures suspended above the threshold, waiting for attention to awaken them.",
+      "This first reveal proves the interaction grammar: gaze, attunement, invocation, arrival, reading, return."
+    ],
+  },
+];
+
+export function getConstellationLoreEntry(id = "arrival-auto-01") {
+  return (
+    CONSTELLATION_LORE_REGISTRY.find((entry) => entry.id === id) ??
+    CONSTELLATION_LORE_REGISTRY[0]
+  );
+}

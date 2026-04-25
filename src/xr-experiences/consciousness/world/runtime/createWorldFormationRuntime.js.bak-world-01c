@@ -1,0 +1,103 @@
+﻿import { ROOM_REGISTRY, getRoomById } from "../core/roomRegistry.js";
+import { PORTAL_REGISTRY, getPortalById } from "../core/portalRegistry.js";
+import { ARTIFACT_REGISTRY } from "../core/artifactRegistry.js";
+import { VOICE_SEED_PROFILES, getVoiceSeedProfile } from "../core/voiceSeedProfiles.js";
+import {
+  WORLD_01_TRAVERSAL,
+  createWorld01TraversalPlan,
+  getInitialRoomId,
+  getNextRoomId,
+  getPreviousRoomId,
+} from "../core/worldGrammar.js";
+import { createTraversalState } from "../core/createTraversalState.js";
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+export function createWorldFormationRuntime() {
+  const state = createTraversalState();
+
+  const markVisited = (roomId) => {
+    if (!roomId) return;
+    if (!state.visitedRoomIds.includes(roomId)) {
+      state.visitedRoomIds.push(roomId);
+    }
+    state.currentRoomId = roomId;
+  };
+
+  const setEntryStage = (stage) => {
+    state.entryStage = stage;
+  };
+
+  const seedWorld = (seedProfileId) => {
+    const profile = getVoiceSeedProfile(seedProfileId);
+    state.seedProfileId = profile.id;
+    return profile;
+  };
+
+  const advanceRoom = () => {
+    const nextRoomId = getNextRoomId(state.currentRoomId);
+    if (nextRoomId) {
+      markVisited(nextRoomId);
+    }
+    return nextRoomId;
+  };
+
+  const rewindRoom = () => {
+    const previousRoomId = getPreviousRoomId(state.currentRoomId);
+    if (previousRoomId) {
+      state.currentRoomId = previousRoomId;
+    }
+    return previousRoomId;
+  };
+
+  const openPortal = (portalId) => {
+    const portal = getPortalById(portalId);
+    if (!portal) return null;
+    if (!state.openedPortalIds.includes(portal.id)) {
+      state.openedPortalIds.push(portal.id);
+    }
+    return portal;
+  };
+
+  const createArtifact = (artifactId, source = "world-event") => {
+    if (!artifactId) return null;
+    state.createdArtifactIds.push(artifactId);
+    state.memoryMarks.push({
+      type: "artifact-created",
+      artifactId,
+      source,
+      roomId: state.currentRoomId,
+      at: Date.now(),
+    });
+    return artifactId;
+  };
+
+  const snapshot = () => ({
+    state: clone(state),
+    rooms: clone(ROOM_REGISTRY),
+    portals: clone(PORTAL_REGISTRY),
+    artifacts: clone(ARTIFACT_REGISTRY),
+    voiceSeedProfiles: clone(VOICE_SEED_PROFILES),
+    traversal: clone(WORLD_01_TRAVERSAL),
+    traversalPlan: clone(createWorld01TraversalPlan()),
+    currentRoom: clone(getRoomById(state.currentRoomId)),
+    currentSeedProfile: clone(getVoiceSeedProfile(state.seedProfileId)),
+  });
+
+  return {
+    state,
+    markVisited,
+    setEntryStage,
+    seedWorld,
+    advanceRoom,
+    rewindRoom,
+    openPortal,
+    createArtifact,
+    getCurrentRoom: () => getRoomById(state.currentRoomId),
+    getCurrentSeedProfile: () => getVoiceSeedProfile(state.seedProfileId),
+    getInitialRoomId,
+    snapshot,
+  };
+}

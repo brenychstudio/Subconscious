@@ -1,0 +1,305 @@
+﻿import * as THREE from "three";
+
+function clamp01(x) {
+  return Math.max(0, Math.min(1, x));
+}
+
+function easeInOutCubic(t) {
+  return t < 0.5
+    ? 4 * t * t * t
+    : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function remap01(x, a, b) {
+  if (b <= a) return x >= b ? 1 : 0;
+  return clamp01((x - a) / (b - a));
+}
+
+function buildHeroLookup(heroStarsGroup) {
+  const map = new Map();
+  heroStarsGroup?.children?.forEach((sprite) => {
+    const id = sprite?.userData?.starId;
+    if (id) map.set(id, sprite);
+  });
+  return map;
+}
+
+function buildPresentationGroup(skySystem, entry) {
+  const group = new THREE.Group();
+  group.name = "constellation-presentation-stage";
+
+  const heroLookup = buildHeroLookup(skySystem.layers.heroStars);
+  const layout = entry.presentationLayout ?? [];
+
+  const lineMaterial = new THREE.LineBasicMaterial({
+    color: 0x9ab3eb,
+    transparent: true,
+    opacity: 0.28,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const starPositions = new Map();
+
+  layout.forEach((node) => {
+    const source = heroLookup.get(node.id);
+    if (!source) return;
+
+    const sprite = source.clone();
+    sprite.material = source.material.clone();
+    sprite.position.set(node.x, node.y, 0);
+    sprite.scale.copy(source.scale).multiplyScalar(0.85);
+
+    group.add(sprite);
+    starPositions.set(node.id, sprite.position.clone());
+  });
+
+  for (let i = 0; i < layout.length - 1; i += 1) {
+    const a = layout[i];
+    const b = layout[i + 1];
+    const pa = starPositions.get(a.id);
+    const pb = starPositions.get(b.id);
+    if (!pa || !pb) continue;
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(
+        [pa.x, pa.y, pa.z, pb.x, pb.y, pb.z],
+        3
+      )
+    );
+
+    const line = new THREE.Line(geometry, lineMaterial.clone());
+    group.add(line);
+  }
+
+  return group;
+}
+
+function collectOriginalSelection(skySystem, starIds) {
+  const starSet = new Set(starIds);
+
+  const stars = skySystem.layers.heroStars.children.filter((sprite) =>
+    starSet.has(sprite?.userData?.starId)
+  );
+
+  const lines = skySystem.layers.constellationLines.children.filter((line) => {
+    const fromId = line?.userData?.fromId;
+    const toId = line?.userData?.toId;
+    return starSet.has(fromId) && starSet.has(toId);
+  });
+
+  return { stars, lines };
+}
+
+function applyDimFactor(originalSelection, factor) {
+  if (!originalSelection) return;
+
+  originalSelection.stars.forEach((sprite) => {
+    const base = sprite.userData.__loreBaseOpacity ?? sprite.material.opacity;
+    sprite.userData.__loreBaseOpacity = base;
+    sprite.material.opacity = base * factor;
+  });
+
+  originalSelection.lines.forEach((line) => {
+    const base = line.userData.__loreBaseOpacity ?? line.material.opacity;
+    line.userData.__loreBaseOpacity = base;
+    line.material.opacity = base * factor;
+  });
+}
+
+function restoreOriginal(originalSelection) {
+  if (!originalSelection) return;
+
+  originalSelection.stars.forEach((sprite) => {
+    const base = sprite.userData.__loreBaseOpacity;
+    if (typeof base === "number") sprite.material.opacity = base;
+  });
+
+  originalSelection.lines.forEach((line) => {
+    const base = line.userData.__loreBaseOpacity;
+    if (typeof base === "number") line.material.opacity = base;
+  });
+}
+
+export function createConstellationRevealController({
+  scene,
+  camera,
+  skySystem,
+  entry,
+  overlay,
+}) {
+  const cameraWorldPos = new THREE.Vector3();
+  const cameraQuat = new THREE.Quaternion();
+  const cameraForward = new THREE.Vector3();
+  const cameraRight = new THREE.Vector3(1, 0, 0);
+  const cameraUp = new THREE.Vector3(0, 1, 0);
+  const revealPosition = new THREE.Vector3();
+  const panelPosition = new THREE.Vector3();
+  const center = new THREE.Vector3();
+
+  let mode = "idle";
+  let progress = 0;
+  let stageGroup = null;
+  let originalSelection = null;
+  let loreOpened = false;
+
+  function getRevealTargetPosition() {
+    camera.getWorldPosition(cameraWorldPos);
+    camera.getWorldQuaternion(cameraQuat);
+
+    cameraForward.set(0, 0, -1).applyQuaternion(cameraQuat).normalize();
+    cameraRight.set(1, 0, 0).applyQuaternion(cameraQuat).normalize();
+    cameraUp.set(0, 1, 0).applyQuaternion(cameraQuat).normalize();
+
+    return revealPosition
+      .copy(cameraWorldPos)
+      .add(cameraForward.clone().multiplyScalar(entry.revealDistance ?? 3.35))
+      .add(cameraRight.clone().multiplyScalar(entry.revealSide ?? -0.55))
+      .add(cameraUp.clone().multiplyScalar(entry.revealLift ?? 0.02));
+  }
+
+  function getPanelTargetPosition() {
+    camera.getWorldPosition(cameraWorldPos);
+    camera.getWorldQuaternion(cameraQuat);
+
+    cameraForward.set(0, 0, -1).applyQuaternion(cameraQuat).normalize();
+    cameraRight.set(1, 0, 0).applyQuaternion(cameraQuat).normalize();
+    cameraUp.set(0, 1, 0).applyQuaternion(cameraQuat).normalize();
+
+    return panelPosition
+      .copy(cameraWorldPos)
+      .add(cameraForward.clone().multiplyScalar(entry.overlayDistance ?? 3.15))
+      .add(cameraRight.clone().multiplyScalar(entry.overlaySide ?? 0.92))
+      .add(cameraUp.clone().multiplyScalar(entry.overlayLift ?? 0.10));
+  }
+
+  function open(target) {
+    if (!target || mode === "opening" || mode === "open") return;
+
+    stageGroup = buildPresentationGroup(skySystem, entry);
+    originalSelection = collectOriginalSelection(skySystem, target.starIds);
+
+    stageGroup.position.copy(target.center);
+    stageGroup.scale.setScalar(0.18);
+    stageGroup.visible = true;
+
+    stageGroup.traverse((obj) => {
+      if (obj.material?.opacity != null) {
+        obj.material.opacity *= 0.18;
+      }
+    });
+
+    scene.add(stageGroup);
+
+    mode = "opening";
+    progress = 0;
+    loreOpened = false;
+  }
+
+  function close() {
+    if (mode === "idle" || mode === "closing") return;
+    mode = "closing";
+    overlay.closeLore();
+  }
+
+  function isOpen() {
+    return mode === "open";
+  }
+
+  function isBusy() {
+    return mode === "opening" || mode === "closing";
+  }
+
+  function update({ dtMs = 16 }) {
+    if (!stageGroup) return;
+
+    const openDuration = entry.openDurationMs ?? 1650;
+    const closeDuration = entry.closeDurationMs ?? 1350;
+    const duration = mode === "closing" ? closeDuration : openDuration;
+    const delta = dtMs / duration;
+
+    if (mode === "opening") {
+      progress = Math.min(1, progress + delta);
+      if (progress >= 1) {
+        progress = 1;
+        mode = "open";
+      }
+    } else if (mode === "closing") {
+      progress = Math.max(0, progress - delta);
+      if (progress <= 0) {
+        restoreOriginal(originalSelection);
+
+        scene.remove(stageGroup);
+        stageGroup.traverse((obj) => {
+          obj.geometry?.dispose?.();
+          if (obj.material) {
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach((mat) => mat.dispose?.());
+            } else {
+              obj.material.dispose?.();
+            }
+          }
+        });
+
+        stageGroup = null;
+        originalSelection = null;
+        loreOpened = false;
+        mode = "idle";
+        return;
+      }
+    }
+
+    const eased = easeInOutCubic(progress);
+    const pullT = easeInOutCubic(remap01(progress, 0.10, 0.88));
+
+    const target = getRevealTargetPosition();
+    const panel = getPanelTargetPosition();
+
+    center.copy(target);
+    center.y += Math.sin(progress * Math.PI) * 0.04;
+
+    stageGroup.position.lerp(center, 0.16);
+    stageGroup.scale.setScalar(0.18 + (entry.revealScale - 0.18) * pullT);
+    stageGroup.lookAt(camera.position);
+
+    stageGroup.traverse((obj) => {
+      if (obj.material?.opacity != null) {
+        const isLine = obj.type === "Line";
+        const targetOpacity = isLine ? 0.28 : 1.0;
+        obj.material.opacity += (targetOpacity - obj.material.opacity) * 0.12;
+      }
+    });
+
+    applyDimFactor(originalSelection, Math.max(0.10, 1 - eased * 0.88));
+
+    const panelThreshold = clamp01((entry.panelDelayMs ?? 540) / openDuration);
+    if (!loreOpened && progress >= panelThreshold) {
+      overlay.openLore({
+        title: entry.title,
+        body: entry.body,
+      });
+      loreOpened = true;
+    }
+
+    overlay.setLoreWorldPosition(panel);
+  }
+
+  function dispose() {
+    restoreOriginal(originalSelection);
+    if (stageGroup) {
+      scene.remove(stageGroup);
+    }
+    overlay.closeLore();
+  }
+
+  return {
+    open,
+    close,
+    update,
+    isOpen,
+    isBusy,
+    dispose,
+  };
+}

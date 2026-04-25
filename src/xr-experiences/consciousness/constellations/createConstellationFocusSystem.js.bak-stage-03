@@ -1,0 +1,134 @@
+﻿import * as THREE from "three";
+import {
+  pickLargestVisibleComponent,
+  getConstellationWorldCentroid,
+  getConstellationWorldRadius,
+} from "./constellationRuntimeUtils.js";
+
+const DEG = Math.PI / 180;
+
+export function createConstellationFocusSystem({
+  camera,
+  skySystem,
+  entry,
+}) {
+  const cameraWorldPos = new THREE.Vector3();
+  const cameraForward = new THREE.Vector3();
+  const cameraQuat = new THREE.Quaternion();
+  const center = new THREE.Vector3();
+  const promptPos = new THREE.Vector3();
+  const towardCamera = new THREE.Vector3();
+
+  let dwellMs = 0;
+  let snapshot = {
+    visible: false,
+    ready: false,
+    progress: 0,
+    label: "",
+    promptWorldPosition: null,
+    target: null,
+  };
+
+  function resolveTarget() {
+    if (entry?.targetStarIds?.length) {
+      const starIds = [...entry.targetStarIds];
+      getConstellationWorldCentroid(skySystem, starIds, center);
+      const radius = getConstellationWorldRadius(skySystem, starIds, center);
+
+      return {
+        id: entry.id,
+        starIds,
+        edgeCount: Math.max(0, starIds.length - 1),
+        center: center.clone(),
+        radius,
+      };
+    }
+
+    const component = pickLargestVisibleComponent(skySystem?.layers?.constellationLines);
+    if (!component) return null;
+
+    getConstellationWorldCentroid(skySystem, component.starIds, center);
+    const radius = getConstellationWorldRadius(skySystem, component.starIds, center);
+
+    return {
+      id: entry.id,
+      starIds: component.starIds,
+      edgeCount: component.edgeCount,
+      center: center.clone(),
+      radius,
+    };
+  }
+
+  function update({ dtMs = 16 }) {
+    const target = resolveTarget();
+
+    if (!target) {
+      dwellMs = 0;
+      snapshot = {
+        visible: false,
+        ready: false,
+        progress: 0,
+        label: "",
+        promptWorldPosition: null,
+        target: null,
+      };
+      return snapshot;
+    }
+
+    camera.getWorldPosition(cameraWorldPos);
+    camera.getWorldQuaternion(cameraQuat);
+    cameraForward.set(0, 0, -1).applyQuaternion(cameraQuat).normalize();
+
+    const toTarget = target.center.clone().sub(cameraWorldPos);
+    const distance = Math.max(0.001, toTarget.length());
+    const direction = toTarget.clone().normalize();
+    const angle = cameraForward.angleTo(direction);
+
+    const focusAngle = (entry.focusAngleDeg ?? 8) * DEG;
+    const releaseAngle = (entry.focusReleaseDeg ?? 11.5) * DEG;
+    const activeThreshold = dwellMs > 0 ? releaseAngle : focusAngle;
+
+    const isFocused = angle <= activeThreshold && distance < 120;
+
+    if (isFocused) {
+      dwellMs = Math.min(entry.dwellMs ?? 900, dwellMs + dtMs);
+    } else {
+      dwellMs = Math.max(0, dwellMs - dtMs * 1.15);
+    }
+
+    const progress = Math.max(0, Math.min(1, dwellMs / (entry.dwellMs ?? 900)));
+    const ready = progress >= 1;
+
+    towardCamera.copy(cameraWorldPos).sub(target.center).normalize();
+
+    promptPos
+      .copy(target.center)
+      .add(new THREE.Vector3(0, target.radius + (entry.promptLift ?? 0.26), 0))
+      .add(towardCamera.multiplyScalar(0.08));
+
+    snapshot = {
+      visible: progress > 0.02,
+      ready,
+      progress,
+      label: ready ? entry.promptReadyLabel : entry.promptLabel,
+      promptWorldPosition: promptPos.clone(),
+      target,
+    };
+
+    return snapshot;
+  }
+
+  function getSnapshot() {
+    return snapshot;
+  }
+
+  function reset() {
+    dwellMs = 0;
+  }
+
+  return {
+    update,
+    getSnapshot,
+    reset,
+  };
+}

@@ -1,0 +1,239 @@
+﻿import * as THREE from "three";
+import {
+  createConstellationCloneGroup,
+  easeInOutCubic,
+} from "./constellationRuntimeUtils.js";
+
+function clamp01(x) {
+  return Math.max(0, Math.min(1, x));
+}
+
+function remap01(x, a, b) {
+  if (b <= a) return x >= b ? 1 : 0;
+  return clamp01((x - a) / (b - a));
+}
+
+export function createConstellationRevealController({
+  scene,
+  camera,
+  skySystem,
+  entry,
+  overlay,
+}) {
+  const cameraWorldPos = new THREE.Vector3();
+  const cameraQuat = new THREE.Quaternion();
+  const cameraForward = new THREE.Vector3();
+  const cameraRight = new THREE.Vector3(1, 0, 0);
+  const cameraUp = new THREE.Vector3(0, 1, 0);
+  const targetPosition = new THREE.Vector3();
+  const panelPosition = new THREE.Vector3();
+
+  let mode = "idle";
+  let progress = 0;
+  let cloneRoot = null;
+  let startCenter = null;
+  let originalSelection = null;
+  let loreOpened = false;
+
+  function collectOriginalSelection(starIds) {
+    const starSet = new Set(starIds);
+
+    const stars = skySystem.layers.heroStars.children.filter((sprite) =>
+      starSet.has(sprite?.userData?.starId)
+    );
+
+    const lines = skySystem.layers.constellationLines.children.filter((line) => {
+      const fromId = line?.userData?.fromId;
+      const toId = line?.userData?.toId;
+      return starSet.has(fromId) && starSet.has(toId);
+    });
+
+    return { stars, lines };
+  }
+
+  function applyDimFactor(factor) {
+    if (!originalSelection) return;
+
+    originalSelection.stars.forEach((sprite) => {
+      const base = sprite.userData.__loreBaseOpacity ?? sprite.material.opacity;
+      sprite.userData.__loreBaseOpacity = base;
+      sprite.material.opacity = base * factor;
+    });
+
+    originalSelection.lines.forEach((line) => {
+      const base = line.userData.__loreBaseOpacity ?? line.material.opacity;
+      line.userData.__loreBaseOpacity = base;
+      line.material.opacity = base * factor;
+    });
+  }
+
+  function restoreOriginal() {
+    if (!originalSelection) return;
+
+    originalSelection.stars.forEach((sprite) => {
+      const base = sprite.userData.__loreBaseOpacity;
+      if (typeof base === "number") sprite.material.opacity = base;
+    });
+
+    originalSelection.lines.forEach((line) => {
+      const base = line.userData.__loreBaseOpacity;
+      if (typeof base === "number") line.material.opacity = base;
+    });
+  }
+
+  function getRevealTargetPosition() {
+    camera.getWorldPosition(cameraWorldPos);
+    camera.getWorldQuaternion(cameraQuat);
+
+    cameraForward.set(0, 0, -1).applyQuaternion(cameraQuat).normalize();
+    cameraRight.set(1, 0, 0).applyQuaternion(cameraQuat).normalize();
+    cameraUp.set(0, 1, 0).applyQuaternion(cameraQuat).normalize();
+
+    return targetPosition
+      .copy(cameraWorldPos)
+      .add(cameraForward.clone().multiplyScalar(entry.revealDistance ?? 2.25))
+      .add(cameraRight.clone().multiplyScalar(entry.revealSide ?? -0.72))
+      .add(cameraUp.clone().multiplyScalar(entry.revealLift ?? 0.02));
+  }
+
+  function getPanelTargetPosition() {
+    camera.getWorldPosition(cameraWorldPos);
+    camera.getWorldQuaternion(cameraQuat);
+
+    cameraForward.set(0, 0, -1).applyQuaternion(cameraQuat).normalize();
+    cameraRight.set(1, 0, 0).applyQuaternion(cameraQuat).normalize();
+    cameraUp.set(0, 1, 0).applyQuaternion(cameraQuat).normalize();
+
+    return panelPosition
+      .copy(cameraWorldPos)
+      .add(cameraForward.clone().multiplyScalar(entry.overlayDistance ?? 2.65))
+      .add(cameraRight.clone().multiplyScalar(entry.overlaySide ?? 0.82))
+      .add(cameraUp.clone().multiplyScalar(entry.overlayLift ?? 0.04));
+  }
+
+  function open(target) {
+    if (!target || mode === "opening" || mode === "open") return;
+
+    const cloneData = createConstellationCloneGroup(skySystem, target.starIds);
+
+    cloneRoot = cloneData.group;
+    startCenter = cloneData.center.clone();
+    originalSelection = collectOriginalSelection(target.starIds);
+    loreOpened = false;
+
+    cloneRoot.traverse((obj) => {
+      if (obj.material?.opacity != null) {
+        obj.material.opacity *= 1.08;
+      }
+    });
+
+    cloneRoot.position.copy(startCenter);
+    cloneRoot.scale.setScalar(1);
+    scene.add(cloneRoot);
+
+    mode = "opening";
+    progress = 0;
+  }
+
+  function close() {
+    if (mode === "idle" || mode === "closing") return;
+    mode = "closing";
+    overlay.closeLore();
+  }
+
+  function isOpen() {
+    return mode === "open";
+  }
+
+  function isBusy() {
+    return mode === "opening" || mode === "closing";
+  }
+
+  function update({ dtMs = 16 }) {
+    if (!cloneRoot) return;
+
+    const openDuration = entry.openDurationMs ?? 1350;
+    const closeDuration = entry.closeDurationMs ?? 1100;
+    const duration = mode === "closing" ? closeDuration : openDuration;
+
+    const delta = dtMs / duration;
+
+    if (mode === "opening") {
+      progress = Math.min(1, progress + delta);
+      if (progress >= 1) {
+        progress = 1;
+        mode = "open";
+      }
+    } else if (mode === "closing") {
+      progress = Math.max(0, progress - delta);
+      if (progress <= 0) {
+        restoreOriginal();
+
+        scene.remove(cloneRoot);
+        cloneRoot.traverse((obj) => {
+          obj.geometry?.dispose?.();
+          if (obj.material) {
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach((mat) => mat.dispose?.());
+            } else {
+              obj.material.dispose?.();
+            }
+          }
+        });
+
+        cloneRoot = null;
+        startCenter = null;
+        originalSelection = null;
+        loreOpened = false;
+        mode = "idle";
+        return;
+      }
+    }
+
+    const eased = easeInOutCubic(progress);
+    const pullT = easeInOutCubic(remap01(progress, 0.08, 0.86));
+    const settleT = remap01(progress, 0.78, 1);
+
+    const target = getRevealTargetPosition();
+    const panel = getPanelTargetPosition();
+
+    cloneRoot.position.lerpVectors(startCenter, target, pullT);
+    cloneRoot.position.y += Math.sin(progress * Math.PI) * 0.08;
+    cloneRoot.scale.setScalar(1 + (entry.revealScale - 1) * eased);
+
+    cloneRoot.lookAt(camera.position);
+
+    const dimFactor = 1 - eased * 0.88;
+    applyDimFactor(Math.max(0.12, dimFactor));
+
+    const panelThreshold = clamp01((entry.panelDelayMs ?? 380) / openDuration);
+    if (!loreOpened && progress >= panelThreshold) {
+      overlay.openLore({
+        title: entry.title,
+        body: entry.body,
+      });
+      loreOpened = true;
+    }
+
+    overlay.setLoreWorldPosition(
+      panel.clone().lerp(target, 0.08 * (1 - settleT))
+    );
+  }
+
+  function dispose() {
+    restoreOriginal();
+    if (cloneRoot) {
+      scene.remove(cloneRoot);
+    }
+    overlay.closeLore();
+  }
+
+  return {
+    open,
+    close,
+    update,
+    isOpen,
+    isBusy,
+    dispose,
+  };
+}
