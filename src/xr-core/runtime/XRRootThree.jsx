@@ -707,6 +707,11 @@ export default function XRRootThree({ manifest, options, xrSupported, xrChecked,
       desktopAttunementHint.style.opacity = "1";
       desktopAttunementHint.style.transform = "translateX(-50%) translateY(0)";
 
+      if (templeSanctuary.isTransformationCueTriggered?.()) {
+        desktopAttunementHint.textContent = "THRESHOLD OPEN";
+        return;
+      }
+
       if (desktopAttunementState.isHolding) {
         desktopAttunementHint.textContent = `ATTUNING ${Math.round(value * 100)}%`;
       } else {

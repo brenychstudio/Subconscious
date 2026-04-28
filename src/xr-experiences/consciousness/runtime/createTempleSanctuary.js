@@ -47,6 +47,33 @@ function createRing(radius, opacity) {
   return ring;
 }
 
+function createThresholdDriftGeometry({ count = 54, radius = 2.15, depth = 0.72 } = {}) {
+  const positions = [];
+  const seeds = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const t = i / Math.max(1, count - 1);
+    const angle = t * Math.PI * 2 * 2.35 + Math.sin(i * 12.9898) * 0.4;
+    const ring = radius * (0.38 + (((i * 37) % 100) / 100) * 0.62);
+    const y = (Math.sin(i * 1.73) * 0.5 + 0.5) * radius * 0.9 - radius * 0.35;
+    const z = Math.sin(i * 2.17) * depth;
+
+    positions.push(
+      Math.cos(angle) * ring,
+      y,
+      z
+    );
+
+    seeds.push(t);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("seed", new THREE.Float32BufferAttribute(seeds, 1));
+
+  return geometry;
+}
+
 function createPylon(width, depth, height, opacity) {
   const group = new THREE.Group();
 
@@ -354,6 +381,28 @@ export function createTempleSanctuary() {
   thresholdVeil.position.z = -0.014;
   thresholdRoot.add(thresholdVeil);
 
+  const thresholdDrift = preset.thresholdDrift ?? {};
+
+  const thresholdDriftPoints = new THREE.Points(
+    createThresholdDriftGeometry({
+      count: thresholdDrift.count ?? 54,
+      radius: thresholdDrift.radius ?? 2.15,
+      depth: thresholdDrift.depth ?? 0.72,
+    }),
+    new THREE.PointsMaterial({
+      color: new THREE.Color(thresholdDrift.color ?? "#a9c4ff"),
+      transparent: true,
+      opacity: 0,
+      size: thresholdDrift.size ?? 0.022,
+      sizeAttenuation: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+  );
+  thresholdDriftPoints.name = "TempleSanctuaryThresholdDrift";
+  thresholdDriftPoints.position.z = -0.08;
+  thresholdRoot.add(thresholdDriftPoints);
+
   let t = 0;
   let proximityLevel = 0;
   let handAttunementTarget = 0;
@@ -362,6 +411,7 @@ export function createTempleSanctuary() {
   let ritualChargeComplete = false;
   let transformationCueTriggered = false;
   let transformationCueLevel = 0;
+  let openingStateLevel = 0;
 
   const chamberWorldPosition = new THREE.Vector3();
   const cameraWorldPosition = new THREE.Vector3();
@@ -455,6 +505,21 @@ export function createTempleSanctuary() {
         transformationCue.smoothing ?? 0.035
       );
 
+      const openingState = preset.openingState ?? {};
+      const openingStateEnabled = openingState.enabled !== false;
+
+      openingStateLevel = THREE.MathUtils.lerp(
+        openingStateLevel,
+        openingStateEnabled && transformationCueTriggered ? 1 : 0,
+        openingState.smoothing ?? 0.028
+      );
+
+      const chargeInfluence =
+        ritualChargeLevel *
+        (transformationCueTriggered
+          ? openingState.chargeDampening ?? 0.52
+          : 1);
+
       const breathSpeed = presence.breathSpeed ?? 1.15;
       const baseBreath = presence.breathAmplitude ?? 0.032;
       const proximityPulseBoost = presence.proximityPulseBoost ?? 0.055;
@@ -470,15 +535,16 @@ export function createTempleSanctuary() {
             baseBreath * 0.45 +
             proximityLevel * proximityPulseBoost +
             handAttunementLevel * attunementPulseBoost +
-            ritualChargeLevel * ritualPulseBoost +
-            transformationCueLevel * transformationPulseBoost
+            chargeInfluence * ritualPulseBoost +
+            transformationCueLevel * transformationPulseBoost +
+            openingStateLevel * (openingState.pulseFloor ?? 0.028)
           );
 
       const proximityScale =
         baseChamberScale +
         proximityLevel * (presence.scaleBoost ?? 0.085) +
         handAttunementLevel * (attunement.scaleBoost ?? 0.038) +
-        ritualChargeLevel * (ritualCharge.scaleBoost ?? 0.045) +
+        chargeInfluence * (ritualCharge.scaleBoost ?? 0.045) +
         transformationCueLevel * (transformationCue.scaleBoost ?? 0.075);
 
       chamberAnchor.scale.setScalar(proximityScale * breath);
@@ -487,7 +553,7 @@ export function createTempleSanctuary() {
         preset.chamber.spinSpeed +
         proximityLevel * (presence.spinBoost ?? 0.14) +
         handAttunementLevel * (attunement.spinBoost ?? 0.055) +
-        ritualChargeLevel * (ritualCharge.spinBoost ?? 0.09) +
+        chargeInfluence * (ritualCharge.spinBoost ?? 0.09) +
         transformationCueLevel * (transformationCue.spinBoost ?? 0.16);
 
       chamberAnchor.rotation.y += deltaSeconds * spin;
@@ -497,13 +563,14 @@ export function createTempleSanctuary() {
         Math.sin(t * 0.8) * 0.08 +
         proximityLevel * (presence.lightBoost ?? 2.1) +
         handAttunementLevel * (attunement.lightBoost ?? 1.25) +
-        ritualChargeLevel * (ritualCharge.lightBoost ?? 1.55) +
+        chargeInfluence * (ritualCharge.lightBoost ?? 1.55) +
         transformationCueLevel * (transformationCue.lightBoost ?? 2.6) +
+        openingStateLevel * (openingState.lightFloor ?? 0.38) +
         Math.max(0, pulseWave) *
           (
             proximityLevel * (presence.lightPulseBoost ?? 0.34) +
             handAttunementLevel * 0.22 +
-            ritualChargeLevel * 0.38 +
+            chargeInfluence * 0.38 +
             transformationCueLevel * 0.5
           );
 
@@ -539,19 +606,52 @@ export function createTempleSanctuary() {
       }
 
       thresholdRing.material.opacity =
-        thresholdAmount * (threshold.ringOpacity ?? 0.105) * cueWave;
+        Math.max(
+          thresholdAmount * (threshold.ringOpacity ?? 0.105),
+          openingStateLevel * (openingState.ringFloor ?? 0.045)
+        ) * cueWave;
 
       thresholdOuterRing.material.opacity =
-        thresholdAmount * (threshold.outerRingOpacity ?? 0.045) * cueWave;
+        Math.max(
+          thresholdAmount * (threshold.outerRingOpacity ?? 0.045),
+          openingStateLevel * (openingState.outerRingFloor ?? 0.022)
+        ) * cueWave;
 
       thresholdVeil.material.opacity =
-        thresholdAmount * (threshold.veilOpacity ?? 0.038) * cueWave;
+        Math.max(
+          thresholdAmount * (threshold.veilOpacity ?? 0.038),
+          openingStateLevel * (openingState.veilFloor ?? 0.018)
+        ) * cueWave;
+
+      const drift = preset.thresholdDrift ?? {};
+      const driftEnabled = drift.enabled !== false;
+      const driftAmount = driftEnabled ? transformationCueLevel : 0;
+
+      thresholdDriftPoints.visible = driftAmount > 0.018;
+
+      if (thresholdDriftPoints.visible) {
+        thresholdDriftPoints.rotation.z +=
+          deltaSeconds * (drift.rotationSpeed ?? 0.018) * (0.3 + driftAmount);
+
+        thresholdDriftPoints.position.y =
+          Math.sin(t * (drift.liftSpeed ?? 0.045)) *
+          (drift.breathing ?? 0.035);
+
+        thresholdDriftPoints.material.opacity =
+          Math.max(
+            driftAmount * (drift.opacity ?? 0.16),
+            openingStateLevel * (openingState.driftFloor ?? 0.075)
+          ) * cueWave;
+      } else {
+        thresholdDriftPoints.material.opacity = 0;
+      }
 
       return Math.max(
         proximityLevel,
         handAttunementLevel * (preset.attunement?.soundBoost ?? 0.75),
-        ritualChargeLevel * (preset.ritualCharge?.soundBoost ?? 0.95),
-        transformationCueLevel * (preset.transformationCue?.soundBoost ?? 1.15)
+        chargeInfluence * (preset.ritualCharge?.soundBoost ?? 0.95),
+        transformationCueLevel * (preset.transformationCue?.soundBoost ?? 1.15),
+        openingStateLevel * (preset.openingState?.soundFloor ?? 0.85)
       );
     },
     setHandAttunement(value = 0) {
@@ -576,6 +676,9 @@ export function createTempleSanctuary() {
     isTransformationCueTriggered() {
       return transformationCueTriggered;
     },
+    getOpeningStateLevel() {
+      return openingStateLevel;
+    },
     resetRitualCharge() {
       ritualChargeLevel = 0;
       ritualChargeComplete = false;
@@ -583,6 +686,7 @@ export function createTempleSanctuary() {
     resetTransformationCue() {
       transformationCueTriggered = false;
       transformationCueLevel = 0;
+      openingStateLevel = 0;
     },
     dispose() {
       root.traverse((obj) => {

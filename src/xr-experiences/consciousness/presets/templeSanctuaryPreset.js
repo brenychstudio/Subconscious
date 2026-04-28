@@ -71,16 +71,16 @@ export const templeSanctuaryPreset = {
   transformationCue: {
     enabled: true,
 
-    smoothing: 0.035,
+    smoothing: 0.032,
 
-    spinBoost: 0.16,
-    lightBoost: 3.4,
-    scaleBoost: 0.095,
-    pulseBoost: 0.16,
+    spinBoost: 0.2,
+    lightBoost: 3.45,
+    scaleBoost: 0.105,
+    pulseBoost: 0.18,
     soundBoost: 1.35,
 
-    callRingOpacity: 0.18,
-    rearGlowOpacity: 0.15,
+    callRingOpacity: 0.22,
+    rearGlowOpacity: 0.18,
 
     holdAfterComplete: true,
   },
@@ -88,20 +88,54 @@ export const templeSanctuaryPreset = {
   thresholdReveal: {
     enabled: true,
 
-    z: -0.92,
+    z: -0.98,
     y: 1.04,
 
-    radius: 1.58,
-    tube: 0.012,
+    radius: 1.72,
+    tube: 0.014,
 
-    ringOpacity: 0.16,
-    outerRingOpacity: 0.075,
-    veilOpacity: 0.065,
+    ringOpacity: 0.19,
+    outerRingOpacity: 0.09,
+    veilOpacity: 0.072,
 
-    rotationSpeed: 0.035,
-    scaleBoost: 0.12,
+    rotationSpeed: 0.048,
+    scaleBoost: 0.13,
 
-    color: "#9fbaff",
+    color: "#b7caff",
+  },
+
+  thresholdDrift: {
+    enabled: true,
+
+    count: 82,
+    radius: 2.38,
+    depth: 0.9,
+
+    size: 0.03,
+    opacity: 0.28,
+
+    rotationSpeed: 0.032,
+    liftSpeed: 0.075,
+    breathing: 0.07,
+
+    color: "#b7d0ff",
+  },
+
+  openingState: {
+    enabled: true,
+
+    smoothing: 0.026,
+
+    chargeDampening: 0.48,
+
+    lightFloor: 0.72,
+    pulseFloor: 0.052,
+    soundFloor: 1.0,
+
+    ringFloor: 0.105,
+    outerRingFloor: 0.052,
+    veilFloor: 0.04,
+    driftFloor: 0.16,
   },
 
   processionalRows: {
