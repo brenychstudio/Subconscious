@@ -138,6 +138,30 @@ export const templeSanctuaryPreset = {
     driftFloor: 0.16,
   },
 
+  axialOpening: {
+    enabled: true,
+
+    z: -1.34,
+    y: 1.22,
+
+    beamHeight: 5.8,
+    beamWidth: 0.34,
+    beamDepthWidth: 1.95,
+
+    coreOpacity: 0.34,
+    sideOpacity: 0.12,
+    veilOpacity: 0.11,
+
+    floorWaveRadius: 2.75,
+    floorWaveOpacity: 0.18,
+
+    pulseSpeed: 1.45,
+    rotationSpeed: 0.024,
+    scaleBoost: 0.18,
+
+    color: "#b8d2ff",
+  },
+
   processionalRows: {
     leftX: -6.35,
     rightX: 6.35,

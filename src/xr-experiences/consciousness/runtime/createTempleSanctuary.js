@@ -38,6 +38,17 @@ function makeBasicGlow({ color = "#a7c2ff", opacity = 0.08 } = {}) {
   });
 }
 
+function makeAxialGlowMaterial({ color = "#b8d2ff", opacity = 0.1 } = {}) {
+  return new THREE.MeshBasicMaterial({
+    color: new THREE.Color(color),
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  });
+}
+
 function createRing(radius, opacity) {
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(Math.max(0.001, radius - 0.06), radius, 96),
@@ -403,6 +414,95 @@ export function createTempleSanctuary() {
   thresholdDriftPoints.position.z = -0.08;
   thresholdRoot.add(thresholdDriftPoints);
 
+  const axialOpening = preset.axialOpening ?? {};
+
+  const axialRoot = new THREE.Group();
+  axialRoot.name = "TempleSanctuaryAxialOpening";
+  axialRoot.position.set(
+    0,
+    preset.altar.height + (axialOpening.y ?? 1.22),
+    axialOpening.z ?? -1.34
+  );
+  axialRoot.visible = false;
+  decorRoot.add(axialRoot);
+
+  const axialCoreBeam = new THREE.Mesh(
+    new THREE.PlaneGeometry(
+      axialOpening.beamWidth ?? 0.34,
+      axialOpening.beamHeight ?? 5.8
+    ),
+    makeAxialGlowMaterial({
+      color: axialOpening.color ?? "#b8d2ff",
+      opacity: 0,
+    })
+  );
+  axialCoreBeam.name = "TempleSanctuaryAxialCoreBeam";
+  axialCoreBeam.position.z = -0.03;
+  axialRoot.add(axialCoreBeam);
+
+  const axialDepthBeam = new THREE.Mesh(
+    new THREE.PlaneGeometry(
+      axialOpening.beamDepthWidth ?? 1.95,
+      axialOpening.beamHeight ?? 5.8
+    ),
+    makeAxialGlowMaterial({
+      color: axialOpening.color ?? "#b8d2ff",
+      opacity: 0,
+    })
+  );
+  axialDepthBeam.name = "TempleSanctuaryAxialDepthBeam";
+  axialDepthBeam.rotation.y = Math.PI / 2;
+  axialDepthBeam.position.z = -0.02;
+  axialRoot.add(axialDepthBeam);
+
+  const axialSideBeamLeft = new THREE.Mesh(
+    new THREE.PlaneGeometry(
+      (axialOpening.beamWidth ?? 0.34) * 0.42,
+      (axialOpening.beamHeight ?? 5.8) * 0.82
+    ),
+    makeAxialGlowMaterial({
+      color: axialOpening.color ?? "#b8d2ff",
+      opacity: 0,
+    })
+  );
+  axialSideBeamLeft.name = "TempleSanctuaryAxialSideBeamLeft";
+  axialSideBeamLeft.position.set(-0.72, 0, -0.055);
+  axialSideBeamLeft.rotation.z = 0.035;
+  axialRoot.add(axialSideBeamLeft);
+
+  const axialSideBeamRight = axialSideBeamLeft.clone();
+  axialSideBeamRight.name = "TempleSanctuaryAxialSideBeamRight";
+  axialSideBeamRight.position.x = 0.72;
+  axialSideBeamRight.rotation.z = -0.035;
+  axialRoot.add(axialSideBeamRight);
+
+  const axialVeil = new THREE.Mesh(
+    new THREE.CircleGeometry(1.72, 96),
+    makeAxialGlowMaterial({
+      color: axialOpening.color ?? "#b8d2ff",
+      opacity: 0,
+    })
+  );
+  axialVeil.name = "TempleSanctuaryAxialVeil";
+  axialVeil.position.z = -0.08;
+  axialRoot.add(axialVeil);
+
+  const axialFloorWave = new THREE.Mesh(
+    new THREE.RingGeometry(
+      Math.max(0.001, (axialOpening.floorWaveRadius ?? 2.75) - 0.055),
+      axialOpening.floorWaveRadius ?? 2.75,
+      128
+    ),
+    makeAxialGlowMaterial({
+      color: axialOpening.color ?? "#b8d2ff",
+      opacity: 0,
+    })
+  );
+  axialFloorWave.name = "TempleSanctuaryAxialFloorWave";
+  axialFloorWave.rotation.x = -Math.PI / 2;
+  axialFloorWave.position.set(0, 0.026, 0);
+  decorRoot.add(axialFloorWave);
+
   let t = 0;
   let proximityLevel = 0;
   let handAttunementTarget = 0;
@@ -637,14 +737,57 @@ export function createTempleSanctuary() {
           Math.sin(t * (drift.liftSpeed ?? 0.045)) *
           (drift.breathing ?? 0.035);
 
-        thresholdDriftPoints.material.opacity =
-          Math.max(
-            driftAmount * (drift.opacity ?? 0.16),
-            openingStateLevel * (openingState.driftFloor ?? 0.075)
-          ) * cueWave;
+      thresholdDriftPoints.material.opacity =
+        Math.max(
+          driftAmount * (drift.opacity ?? 0.16),
+          openingStateLevel * (openingState.driftFloor ?? 0.075)
+        ) * cueWave;
       } else {
         thresholdDriftPoints.material.opacity = 0;
       }
+
+      const axial = preset.axialOpening ?? {};
+      const axialEnabled = axial.enabled !== false;
+      const axialAmount = axialEnabled ? openingStateLevel : 0;
+      const axialPulse =
+        0.68 +
+        Math.max(0, Math.sin(t * (axial.pulseSpeed ?? 1.45))) * 0.32;
+
+      axialRoot.visible = axialAmount > 0.018;
+
+      if (axialRoot.visible) {
+        axialRoot.rotation.z +=
+          deltaSeconds *
+          (axial.rotationSpeed ?? 0.024) *
+          (0.25 + axialAmount);
+
+        axialRoot.scale.setScalar(
+          1 + axialAmount * (axial.scaleBoost ?? 0.18)
+        );
+      }
+
+      axialCoreBeam.material.opacity =
+        axialAmount * (axial.coreOpacity ?? 0.34) * axialPulse;
+
+      axialDepthBeam.material.opacity =
+        axialAmount * (axial.veilOpacity ?? 0.11) * axialPulse;
+
+      axialSideBeamLeft.material.opacity =
+        axialAmount * (axial.sideOpacity ?? 0.12) * axialPulse;
+
+      axialSideBeamRight.material.opacity =
+        axialAmount * (axial.sideOpacity ?? 0.12) * axialPulse;
+
+      axialVeil.material.opacity =
+        axialAmount * (axial.veilOpacity ?? 0.11) * axialPulse;
+
+      axialFloorWave.visible = axialAmount > 0.018;
+      axialFloorWave.material.opacity =
+        axialAmount * (axial.floorWaveOpacity ?? 0.18) * axialPulse;
+
+      axialFloorWave.scale.setScalar(
+        0.88 + axialAmount * 0.18 + Math.max(0, Math.sin(t * 0.65)) * 0.035
+      );
 
       return Math.max(
         proximityLevel,
