@@ -67,6 +67,21 @@ export const templeSanctuaryPreset = {
       lateralAmplitude: 0.02,
     },
 
+    mist: {
+      enabled: true,
+      count: 96,
+      radius: 2.2,
+      depth: 2.0,
+      yMin: 0.15,
+      yMax: 2.05,
+      size: 0.019,
+      opacity: 0.07,
+      drift: 0.12,
+      spin: 0.00035,
+      verticalAmplitude: 0.02,
+      lateralAmplitude: 0.015,
+    },
+
     haze: {
       color: 0xdbe8ff,
 
@@ -90,6 +105,35 @@ export const templeSanctuaryPreset = {
       glowOpacityMax: 0.085,
       glowScaleAmp: 0.055,
     },
+
+    localHazeOpacity: 0.0,
+    localHazeScale: 0.0,
+    localHazeHeight: 0.0,
+    localHazeBreathSpeed: 0.0,
+    localHazePostOpenBoost: 0.0,
+
+    chamberBreathLightMin: 1.92,
+    chamberBreathLightMax: 2.82,
+    chamberBreathSpeed: 0.72,
+    chamberAmbientLift: 0.085,
+    portalAreaLift: 0.11,
+    atmosphereBreathSpeed: 0.52,
+    atmosphereDustCount: 168,
+    atmosphereDustOpacity: 0.058,
+    atmosphereDustSpread: 2.45,
+    atmosphereDustDrift: 0.09,
+    atmosphereDustRise: 0.016,
+    thresholdLightBoost: 0.18,
+  },
+
+  lightDirection: {
+    centralLightIntensityMin: 1.88,
+    centralLightIntensityMax: 2.58,
+    centralLightBreathSpeed: 0.64,
+    chamberReadabilityBoost: 0.18,
+    postOpenLightBoost: 0.24,
+    portalBacklightIntensity: 0.42,
+    floorBounceOpacity: 0.032,
   },
 
   presence: {
@@ -210,30 +254,6 @@ export const templeSanctuaryPreset = {
     driftFloor: 0.16,
   },
 
-  axialOpening: {
-    enabled: true,
-
-    z: -1.34,
-    y: 1.22,
-
-    beamHeight: 5.2,
-    beamWidth: 0.18,
-    beamDepthWidth: 1.2,
-
-    coreOpacity: 0.0,
-    sideOpacity: 0.0,
-    veilOpacity: 0.0,
-
-    floorWaveRadius: 2.75,
-    floorWaveOpacity: 0.0,
-
-    pulseSpeed: 1.1,
-    rotationSpeed: 0.0,
-    scaleBoost: 0.0,
-
-    color: "#c8dcff",
-  },
-
   spaceResponse: {
     enabled: true,
 
@@ -256,22 +276,61 @@ export const templeSanctuaryPreset = {
   chamberDissolve: {
     enabled: true,
 
-    startAtOpen: 0.36,
-    rampSpeed: 0.052,
+    startAtOpen: 0.3,
+    rampSpeed: 0.024,
 
-    particleCount: 620,
-    particleSize: 0.026,
-    particleOpacity: 0.86,
+    particleCount: 240,
+    particleSize: 0.018,
+    particleOpacity: 0.72,
     particleColor: "#f2f6ff",
 
-    outwardDistance: 3.35,
-    upwardLift: 0.82,
-    wobble: 0.09,
+    particleRadiusMin: 0.22,
+    particleRadiusMax: 0.72,
 
-    shellFadeTo: 0.0,
-    coreFadeTo: 0.0,
-    rootScaleTo: 0.38,
-    hideAt: 0.94,
+    outwardDistance: 3.15,
+    upwardLift: 0.68,
+    wobble: 0.06,
+
+    shellFadeTo: 0.045,
+    coreFadeTo: 0.02,
+    rootScaleTo: 0.82,
+    hideAt: 0.994,
+  },
+
+  localPresence: {
+    enabled: true,
+
+    startAtOpen: 0.1,
+
+    nearCount: 84,
+    nearRadius: 1.28,
+    nearDepth: 1.1,
+    nearYMin: -0.12,
+    nearYMax: 1.52,
+    nearSize: 0.016,
+    nearOpacity: 0.082,
+
+    farCount: 124,
+    farRadius: 2.35,
+    farDepth: 1.9,
+    farYMin: -0.22,
+    farYMax: 1.95,
+    farSize: 0.013,
+    farOpacity: 0.052,
+
+    hazeCount: 72,
+    hazeRadius: 3.15,
+    hazeDepth: 2.35,
+    hazeYMin: -0.18,
+    hazeYMax: 2.18,
+    hazeSize: 0.011,
+    hazeOpacity: 0.026,
+
+    drift: 0.11,
+    spin: 0.0003,
+    breathSpeed: 0.58,
+    scaleAmp: 0.052,
+    color: "#dce8ff",
   },
 
   transitionPortal: {
@@ -286,6 +345,14 @@ export const templeSanctuaryPreset = {
 
     startAtRelease: 0.18,
     rampSpeed: 0.055,
+
+    portalRotationSpeedOuter: 0.06,
+    portalRotationSpeedInner: 0.11,
+    portalPullStrength: 0.26,
+    portalParticleCount: 220,
+    portalParticleOpacity: 0.34,
+    portalDepthOpacity: 0.26,
+    portalBreathSpeed: 0.92,
 
     coreOpacity: 0.36,
     ringOpacity: 0.34,

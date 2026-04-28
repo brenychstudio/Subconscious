@@ -94,6 +94,7 @@ function createRing(radius, opacity) {
 function createThresholdDriftGeometry({ count = 54, radius = 2.15, depth = 0.72 } = {}) {
   const positions = [];
   const seeds = [];
+  const basePositions = [];
 
   for (let i = 0; i < count; i += 1) {
     const t = i / Math.max(1, count - 1);
@@ -108,12 +109,19 @@ function createThresholdDriftGeometry({ count = 54, radius = 2.15, depth = 0.72 
       z
     );
 
+    basePositions.push(
+      Math.cos(angle) * ring,
+      y,
+      z
+    );
+
     seeds.push(t);
   }
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("seed", new THREE.Float32BufferAttribute(seeds, 1));
+  geometry.userData.basePositions = new Float32Array(basePositions);
 
   return geometry;
 }
@@ -256,7 +264,7 @@ function sanctuaryRand(min, max) {
   return min + Math.random() * (max - min);
 }
 
-function createSanctuaryDustLayer(THREE, spec, color = 0xffffff) {
+function createSanctuaryDustLayer(THREE, spec, color = 0xffffff, texture = null) {
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(spec.count * 3);
   const basePositions = new Float32Array(spec.count * 3);
@@ -288,6 +296,9 @@ function createSanctuaryDustLayer(THREE, spec, color = 0xffffff) {
   geometry.userData.phases = phases;
 
   const material = new THREE.PointsMaterial({
+    map: texture || undefined,
+    alphaMap: texture || undefined,
+    alphaTest: texture ? 0.002 : 0,
     color,
     size: spec.size,
     transparent: true,
@@ -295,11 +306,20 @@ function createSanctuaryDustLayer(THREE, spec, color = 0xffffff) {
     depthWrite: false,
     sizeAttenuation: true,
     blending: THREE.AdditiveBlending,
+    toneMapped: false,
   });
 
   const points = new THREE.Points(geometry, material);
   points.userData.spec = spec;
   return points;
+}
+
+function createSanctuaryMistLayer(THREE, spec, color = 0xffffff) {
+  return createSanctuaryDustLayer(THREE, spec, color);
+}
+
+function createSanctuaryLocalPresenceLayer(THREE, spec, texture, color = 0xffffff) {
+  return createSanctuaryDustLayer(THREE, spec, color, texture);
 }
 
 function updateSanctuaryDustLayer(points, elapsed, breathMix) {
@@ -330,22 +350,6 @@ function updateSanctuaryDustLayer(points, elapsed, breathMix) {
   points.geometry.attributes.position.needsUpdate = true;
   points.rotation.y += spec.spin;
   points.material.opacity = spec.opacity * (0.82 + breathMix * 0.32);
-}
-
-function createSanctuaryHazeShell(THREE, radius, height, color, opacity) {
-  const shell = new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 28, 18),
-    new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    })
-  );
-
-  shell.scale.set(1, height / radius, 1);
-  return shell;
 }
 
 export function createTempleSanctuary() {
@@ -452,6 +456,31 @@ export function createTempleSanctuary() {
   chamberLight.position.set(0, preset.altar.height + 1.2, 0);
   root.add(chamberLight);
 
+  const lightDirectionPreset = preset.lightDirection ?? {};
+  const chamberFillTarget = new THREE.Object3D();
+  chamberFillTarget.name = "TempleSanctuaryChamberFillTarget";
+  chamberFillTarget.position.set(0, preset.altar.height + 1.0, 0.22);
+  root.add(chamberFillTarget);
+
+  const chamberFillLight = new THREE.DirectionalLight(
+    new THREE.Color("#dbe8ff"),
+    0.22
+  );
+  chamberFillLight.name = "TempleSanctuaryChamberFillLight";
+  chamberFillLight.position.set(1.9, 4.95, 3.2);
+  chamberFillLight.target = chamberFillTarget;
+  root.add(chamberFillLight);
+
+  const portalBacklight = new THREE.PointLight(
+    new THREE.Color("#c8dbff"),
+    0,
+    10,
+    2
+  );
+  portalBacklight.name = "TempleSanctuaryPortalBacklight";
+  portalBacklight.position.set(0, preset.altar.height + 1.02, -2.4);
+  root.add(portalBacklight);
+
   const callRing = new THREE.Mesh(
     new THREE.TorusGeometry(
       preset.callLight.ringRadius,
@@ -549,95 +578,6 @@ export function createTempleSanctuary() {
   thresholdDriftPoints.position.z = -0.08;
   thresholdRoot.add(thresholdDriftPoints);
 
-  const axialOpening = preset.axialOpening ?? {};
-
-  const axialRoot = new THREE.Group();
-  axialRoot.name = "TempleSanctuaryAxialOpening";
-  axialRoot.position.set(
-    0,
-    preset.altar.height + (axialOpening.y ?? 1.22),
-    axialOpening.z ?? -1.34
-  );
-  axialRoot.visible = false;
-  decorRoot.add(axialRoot);
-
-  const axialCoreBeam = new THREE.Mesh(
-    new THREE.PlaneGeometry(
-      axialOpening.beamWidth ?? 0.34,
-      axialOpening.beamHeight ?? 5.8
-    ),
-    makeAxialGlowMaterial({
-      color: axialOpening.color ?? "#b8d2ff",
-      opacity: 0,
-    })
-  );
-  axialCoreBeam.name = "TempleSanctuaryAxialCoreBeam";
-  axialCoreBeam.position.z = -0.03;
-  axialRoot.add(axialCoreBeam);
-
-  const axialDepthBeam = new THREE.Mesh(
-    new THREE.PlaneGeometry(
-      axialOpening.beamDepthWidth ?? 1.95,
-      axialOpening.beamHeight ?? 5.8
-    ),
-    makeAxialGlowMaterial({
-      color: axialOpening.color ?? "#b8d2ff",
-      opacity: 0,
-    })
-  );
-  axialDepthBeam.name = "TempleSanctuaryAxialDepthBeam";
-  axialDepthBeam.rotation.y = Math.PI / 2;
-  axialDepthBeam.position.z = -0.02;
-  axialRoot.add(axialDepthBeam);
-
-  const axialSideBeamLeft = new THREE.Mesh(
-    new THREE.PlaneGeometry(
-      (axialOpening.beamWidth ?? 0.34) * 0.42,
-      (axialOpening.beamHeight ?? 5.8) * 0.82
-    ),
-    makeAxialGlowMaterial({
-      color: axialOpening.color ?? "#b8d2ff",
-      opacity: 0,
-    })
-  );
-  axialSideBeamLeft.name = "TempleSanctuaryAxialSideBeamLeft";
-  axialSideBeamLeft.position.set(-0.72, 0, -0.055);
-  axialSideBeamLeft.rotation.z = 0.035;
-  axialRoot.add(axialSideBeamLeft);
-
-  const axialSideBeamRight = axialSideBeamLeft.clone();
-  axialSideBeamRight.name = "TempleSanctuaryAxialSideBeamRight";
-  axialSideBeamRight.position.x = 0.72;
-  axialSideBeamRight.rotation.z = -0.035;
-  axialRoot.add(axialSideBeamRight);
-
-  const axialVeil = new THREE.Mesh(
-    new THREE.CircleGeometry(1.72, 96),
-    makeAxialGlowMaterial({
-      color: axialOpening.color ?? "#b8d2ff",
-      opacity: 0,
-    })
-  );
-  axialVeil.name = "TempleSanctuaryAxialVeil";
-  axialVeil.position.z = -0.08;
-  axialRoot.add(axialVeil);
-
-  const axialFloorWave = new THREE.Mesh(
-    new THREE.RingGeometry(
-      Math.max(0.001, (axialOpening.floorWaveRadius ?? 2.75) - 0.055),
-      axialOpening.floorWaveRadius ?? 2.75,
-      128
-    ),
-    makeAxialGlowMaterial({
-      color: axialOpening.color ?? "#b8d2ff",
-      opacity: 0,
-    })
-  );
-  axialFloorWave.name = "TempleSanctuaryAxialFloorWave";
-  axialFloorWave.rotation.x = -Math.PI / 2;
-  axialFloorWave.position.set(0, 0.026, 0);
-  decorRoot.add(axialFloorWave);
-
   const chamberRoot = chamberAnchor;
   const spaceResponse = preset.spaceResponse ?? {};
   const chamberDissolve = preset.chamberDissolve ?? {};
@@ -661,46 +601,35 @@ export function createTempleSanctuary() {
       THREE,
       atmospherePreset.backgroundDust
     );
-
-    const nearHaze = createSanctuaryHazeShell(
+    const mist = createSanctuaryMistLayer(
       THREE,
-      atmospherePreset.haze.nearRadius,
-      atmospherePreset.haze.nearHeight,
+      atmospherePreset.mist,
+      atmospherePreset.haze.color
+    );
+    const atmosphereDust = createSanctuaryDustLayer(
+      THREE,
+      {
+        count: atmospherePreset.atmosphereDustCount ?? 168,
+        radius: atmospherePreset.atmosphereDustSpread ?? 2.45,
+        depth: (atmospherePreset.atmosphereDustSpread ?? 2.45) * 0.78,
+        yMin: 0.08,
+        yMax: 2.15,
+        size: 0.015,
+        opacity: atmospherePreset.atmosphereDustOpacity ?? 0.058,
+        drift: atmospherePreset.atmosphereDustDrift ?? 0.09,
+        spin: 0.00028,
+        verticalAmplitude: atmospherePreset.atmosphereDustRise ?? 0.016,
+        lateralAmplitude: 0.012,
+      },
       atmospherePreset.haze.color,
-      atmospherePreset.haze.nearOpacity
+      softPointTexture
     );
 
-    const midHaze = createSanctuaryHazeShell(
-      THREE,
-      atmospherePreset.haze.midRadius,
-      atmospherePreset.haze.midHeight,
-      atmospherePreset.haze.color,
-      atmospherePreset.haze.midOpacity
-    );
-
-    const farHaze = createSanctuaryHazeShell(
-      THREE,
-      atmospherePreset.haze.farRadius,
-      atmospherePreset.haze.farHeight,
-      atmospherePreset.haze.color,
-      atmospherePreset.haze.farOpacity
-    );
-
-    const breathingGlow = createSanctuaryHazeShell(
-      THREE,
-      atmospherePreset.breath.glowRadius,
-      atmospherePreset.breath.glowRadius * 0.72,
-      atmospherePreset.haze.color,
-      atmospherePreset.breath.glowOpacityMin
-    );
-
-    atmosphereRoot.add(farHaze);
     atmosphereRoot.add(backgroundDust);
-    atmosphereRoot.add(midHaze);
     atmosphereRoot.add(midDust);
-    atmosphereRoot.add(nearHaze);
     atmosphereRoot.add(foregroundDust);
-    atmosphereRoot.add(breathingGlow);
+    atmosphereRoot.add(mist);
+    atmosphereRoot.add(atmosphereDust);
 
     root.add(atmosphereRoot);
 
@@ -709,10 +638,90 @@ export function createTempleSanctuary() {
       foregroundDust,
       midDust,
       backgroundDust,
-      nearHaze,
-      midHaze,
-      farHaze,
-      breathingGlow,
+      mist,
+      atmosphereDust,
+    };
+  }
+
+  const localPresencePreset = preset.localPresence ?? {};
+  let localPresence = null;
+
+  if (localPresencePreset?.enabled) {
+    const localPresenceRoot = new THREE.Group();
+    localPresenceRoot.name = "TempleSanctuaryLocalPresence";
+    localPresenceRoot.position.set(
+      0,
+      preset.altar.height + preset.chamber.offsetY,
+      0
+    );
+    altarRoot.add(localPresenceRoot);
+
+    const localPresenceNear = createSanctuaryLocalPresenceLayer(
+      THREE,
+      {
+        count: localPresencePreset.nearCount ?? 84,
+        radius: localPresencePreset.nearRadius ?? 1.28,
+        depth: localPresencePreset.nearDepth ?? 1.1,
+        yMin: localPresencePreset.nearYMin ?? -0.12,
+        yMax: localPresencePreset.nearYMax ?? 1.52,
+        size: localPresencePreset.nearSize ?? 0.016,
+        opacity: localPresencePreset.nearOpacity ?? 0.07,
+        drift: localPresencePreset.drift ?? 0.11,
+        spin: localPresencePreset.spin ?? 0.0003,
+        verticalAmplitude: 0.014,
+        lateralAmplitude: 0.011,
+      },
+      softPointTexture,
+      localPresencePreset.color ?? "#dce8ff"
+    );
+
+    const localPresenceFar = createSanctuaryLocalPresenceLayer(
+      THREE,
+      {
+        count: localPresencePreset.farCount ?? 124,
+        radius: localPresencePreset.farRadius ?? 2.35,
+        depth: localPresencePreset.farDepth ?? 1.9,
+        yMin: localPresencePreset.farYMin ?? -0.22,
+        yMax: localPresencePreset.farYMax ?? 1.95,
+        size: localPresencePreset.farSize ?? 0.013,
+        opacity: localPresencePreset.farOpacity ?? 0.042,
+        drift: localPresencePreset.drift ?? 0.11,
+        spin: (localPresencePreset.spin ?? 0.0003) * 0.7,
+        verticalAmplitude: 0.018,
+        lateralAmplitude: 0.013,
+      },
+      softPointTexture,
+      localPresencePreset.color ?? "#dce8ff"
+    );
+
+    const localPresenceHaze = createSanctuaryLocalPresenceLayer(
+      THREE,
+      {
+        count: localPresencePreset.hazeCount ?? 72,
+        radius: localPresencePreset.hazeRadius ?? 3.15,
+        depth: localPresencePreset.hazeDepth ?? 2.35,
+        yMin: localPresencePreset.hazeYMin ?? -0.18,
+        yMax: localPresencePreset.hazeYMax ?? 2.18,
+        size: localPresencePreset.hazeSize ?? 0.011,
+        opacity: localPresencePreset.hazeOpacity ?? 0.026,
+        drift: localPresencePreset.drift ?? 0.11,
+        spin: (localPresencePreset.spin ?? 0.0003) * 0.55,
+        verticalAmplitude: 0.014,
+        lateralAmplitude: 0.016,
+      },
+      softPointTexture,
+      localPresencePreset.color ?? "#dce8ff"
+    );
+
+    localPresenceRoot.add(localPresenceFar);
+    localPresenceRoot.add(localPresenceHaze);
+    localPresenceRoot.add(localPresenceNear);
+
+    localPresence = {
+      root: localPresenceRoot,
+      near: localPresenceNear,
+      far: localPresenceFar,
+      haze: localPresenceHaze,
     };
   }
 
@@ -815,7 +824,7 @@ export function createTempleSanctuary() {
     });
   };
 
-  const dissolveParticleCount = chamberDissolve.particleCount ?? 340;
+  const dissolveParticleCount = chamberDissolve.particleCount ?? 240;
   const dissolvePositions = new Float32Array(dissolveParticleCount * 3);
   const dissolveBasePositions = new Float32Array(dissolveParticleCount * 3);
   const dissolveDirections = new Float32Array(dissolveParticleCount * 3);
@@ -828,7 +837,11 @@ export function createTempleSanctuary() {
     const v = Math.random() * 2 - 1;
     const phi = Math.acos(v);
 
-    const radius = 0.18 + Math.random() * 0.52;
+    const radius = THREE.MathUtils.lerp(
+      chamberDissolve.particleRadiusMin ?? 0.22,
+      chamberDissolve.particleRadiusMax ?? 0.72,
+      Math.random()
+    );
 
     const x = Math.sin(phi) * Math.cos(theta) * radius;
     const y = Math.cos(phi) * radius;
@@ -852,8 +865,8 @@ export function createTempleSanctuary() {
     dissolveDirections[i * 3 + 1] = dir.y;
     dissolveDirections[i * 3 + 2] = dir.z;
 
-    dissolveSpeeds[i] = 0.6 + Math.random() * 0.8;
-    dissolveLift[i] = 0.4 + Math.random() * 0.7;
+    dissolveSpeeds[i] = 0.28 + Math.random() * 0.44;
+    dissolveLift[i] = 0.22 + Math.random() * 0.42;
     dissolvePhase[i] = Math.random() * Math.PI * 2;
   }
 
@@ -942,7 +955,8 @@ export function createTempleSanctuary() {
   transitionPortalInnerRing.position.z = -0.02;
   transitionPortalRoot.add(transitionPortalInnerRing);
 
-  const portalParticleCount = transitionPortal.particleCount ?? 240;
+  const portalParticleCount =
+    transitionPortal.portalParticleCount ?? transitionPortal.particleCount ?? 240;
   const portalParticlePositions = new Float32Array(portalParticleCount * 3);
   const portalParticleBasePositions = new Float32Array(portalParticleCount * 3);
   const portalParticlePhase = new Float32Array(portalParticleCount);
@@ -950,11 +964,13 @@ export function createTempleSanctuary() {
   for (let i = 0; i < portalParticleCount; i += 1) {
     const angle = Math.random() * Math.PI * 2;
     const radius = THREE.MathUtils.lerp(
-      transitionPortal.innerRadius ?? 0.62,
-      transitionPortal.radius ?? 1.22,
+      transitionPortal.portalParticleRadiusMin ?? transitionPortal.innerRadius ?? 0.62,
+      transitionPortal.portalParticleRadiusMax ?? transitionPortal.radius ?? 1.22,
       Math.random()
     );
-    const depth = -Math.random() * (transitionPortal.particleDepth ?? 3.2);
+    const depth =
+      -Math.random() *
+      (transitionPortal.portalParticleDepth ?? transitionPortal.particleDepth ?? 3.2);
 
     const x = Math.cos(angle) * radius;
     const y = Math.sin(angle) * radius;
@@ -982,7 +998,10 @@ export function createTempleSanctuary() {
     alphaMap: softPointTexture,
     alphaTest: softPointTexture ? 0.002 : 0,
     color: new THREE.Color(transitionPortal.color ?? "#bcd6ff"),
-    size: transitionPortal.particleSize ?? 0.022,
+    size:
+      transitionPortal.portalParticleSize ??
+      transitionPortal.particleSize ??
+      0.022,
     transparent: true,
     opacity: 0,
     depthWrite: false,
@@ -1148,8 +1167,8 @@ export function createTempleSanctuary() {
 
       const dissolveScaleMultiplier = THREE.MathUtils.lerp(
         1,
-        chamberDissolve.rootScaleTo ?? 0.38,
-        chamberReleaseAmount
+        chamberDissolve.rootScaleTo ?? 0.66,
+        Math.pow(chamberReleaseAmount, 1.65)
       );
 
       chamberAnchor.scale.setScalar(
@@ -1165,21 +1184,49 @@ export function createTempleSanctuary() {
 
       chamberAnchor.rotation.y += deltaSeconds * spin;
 
+      const threshold = preset.thresholdReveal ?? {};
+      const thresholdEnabled = threshold.enabled !== false;
+      const thresholdAmount = thresholdEnabled ? transformationCueLevel : 0;
+      const lightDirection = preset.lightDirection ?? {};
+      const centralBreathSpeed =
+        lightDirection.centralLightBreathSpeed ?? atmospherePreset.chamberBreathSpeed ?? 0.72;
+      const centralBreath = 0.5 + 0.5 * Math.sin(t * centralBreathSpeed);
+      const centralBaseLight = THREE.MathUtils.lerp(
+        lightDirection.centralLightIntensityMin ?? atmospherePreset.chamberBreathLightMin ?? 1.92,
+        lightDirection.centralLightIntensityMax ?? atmospherePreset.chamberBreathLightMax ?? 2.82,
+        centralBreath
+      );
+      const readabilityBoost =
+        1 +
+        openingStateLevel * (lightDirection.chamberReadabilityBoost ?? 0.18) +
+        thresholdAmount * (lightDirection.postOpenLightBoost ?? 0.24);
+
       chamberLight.intensity =
-        preset.chamber.lightIntensity +
-        Math.sin(t * 0.8) * 0.08 +
-        proximityLevel * (presence.lightBoost ?? 2.1) +
-        handAttunementLevel * (attunement.lightBoost ?? 1.25) +
-        chargeInfluence * (ritualCharge.lightBoost ?? 1.55) +
-        transformationCueLevel * (transformationCue.lightBoost ?? 2.6) +
-        openingStateLevel * (openingState.lightFloor ?? 0.38) +
-        Math.max(0, pulseWave) *
-          (
-            proximityLevel * (presence.lightPulseBoost ?? 0.34) +
-            handAttunementLevel * 0.22 +
-            chargeInfluence * 0.38 +
-            transformationCueLevel * 0.5
-          );
+        centralBaseLight * readabilityBoost +
+        proximityLevel * 0.18 +
+        handAttunementLevel * 0.24 +
+        chargeInfluence * 0.32 +
+        transformationCueLevel * 0.58 +
+        openingStateLevel * (atmospherePreset.chamberAmbientLift ?? 0.085) +
+        openingStateLevel * (atmospherePreset.portalAreaLift ?? 0.11) * 0.5 +
+        thresholdAmount * (atmospherePreset.thresholdLightBoost ?? 0.18);
+
+      chamberFillLight.intensity =
+        centralBaseLight *
+        0.12 *
+        readabilityBoost *
+        (0.92 + openingStateLevel * 0.08);
+      chamberFillTarget.position.set(
+        0,
+        preset.altar.height + 1.0 + openingStateLevel * 0.06,
+        0.16 + thresholdAmount * 0.18
+      );
+
+      portalBacklight.intensity =
+        thresholdAmount *
+        (lightDirection.portalBacklightIntensity ?? 0.42) *
+        (0.78 + centralBreath * 0.22);
+      portalBacklight.position.z = -2.4 - thresholdAmount * 0.12;
 
       const cueWave = 0.72 + Math.max(0, pulseWave) * 0.28;
 
@@ -1190,14 +1237,11 @@ export function createTempleSanctuary() {
           cueWave;
 
       rearGlow.material.opacity =
-        Math.max(0, preset.callLight.rearGlowOpacity) +
-        transformationCueLevel *
-          (transformationCue.rearGlowOpacity ?? 0.11) *
-          cueWave;
-
-      const threshold = preset.thresholdReveal ?? {};
-      const thresholdEnabled = threshold.enabled !== false;
-      const thresholdAmount = thresholdEnabled ? transformationCueLevel : 0;
+        Math.max(
+          preset.callLight.rearGlowOpacity,
+          thresholdAmount * (lightDirection.floorBounceOpacity ?? 0.032)
+        ) +
+        transformationCueLevel * (transformationCue.rearGlowOpacity ?? 0.11) * cueWave;
 
       thresholdRoot.visible = thresholdAmount > 0.012;
 
@@ -1210,6 +1254,15 @@ export function createTempleSanctuary() {
         thresholdRoot.scale.setScalar(
           1 + thresholdAmount * (threshold.scaleBoost ?? 0.085)
         );
+
+        thresholdRing.rotation.z += deltaSeconds * 0.018 * thresholdAmount;
+        thresholdOuterRing.rotation.z -= deltaSeconds * 0.012 * thresholdAmount;
+        thresholdVeil.rotation.z += deltaSeconds * 0.009 * thresholdAmount;
+
+        thresholdRing.scale.setScalar(1 + thresholdAmount * 0.014);
+        thresholdOuterRing.scale.setScalar(1 + thresholdAmount * 0.018);
+        thresholdVeil.scale.setScalar(1 + thresholdAmount * 0.012);
+        thresholdVeil.position.z = -0.014 - thresholdAmount * 0.012;
       }
 
       thresholdRing.material.opacity =
@@ -1244,6 +1297,38 @@ export function createTempleSanctuary() {
           Math.sin(t * (drift.liftSpeed ?? 0.045)) *
           (drift.breathing ?? 0.035);
 
+        const driftAttr = thresholdDriftPoints.geometry.getAttribute("position");
+        const driftBase = thresholdDriftPoints.geometry.userData.basePositions;
+        const driftSeed = thresholdDriftPoints.geometry.getAttribute("seed");
+        const driftPull = thresholdAmount * (transitionPortal.portalPullStrength ?? 0.26);
+
+        if (driftAttr && driftBase && driftSeed) {
+          for (let i = 0; i < driftSeed.count; i += 1) {
+            const ix = i * 3 + 0;
+            const iy = i * 3 + 1;
+            const iz = i * 3 + 2;
+            const phase = driftSeed.array[i] * Math.PI * 2;
+            const pull = driftPull * (0.42 + driftSeed.array[i] * 0.22);
+            const swirl = 0.014 + thresholdAmount * 0.012;
+
+            driftAttr.array[ix] =
+              driftBase[ix] * (1 - pull) +
+              Math.cos(t * 0.56 + phase) * swirl * 0.75;
+
+            driftAttr.array[iy] =
+              driftBase[iy] * (1 - pull * 0.14) +
+              Math.sin(t * 0.68 + phase) * swirl * 0.9;
+
+            driftAttr.array[iz] =
+              driftBase[iz] -
+              thresholdAmount * 0.12 -
+              pull * 0.2 +
+              Math.sin(t * 0.46 + phase) * swirl * 0.7;
+          }
+
+          driftAttr.needsUpdate = true;
+        }
+
         thresholdDriftPoints.material.opacity =
           Math.max(
             driftAmount * (drift.opacity ?? 0.16),
@@ -1253,88 +1338,101 @@ export function createTempleSanctuary() {
         thresholdDriftPoints.material.opacity = 0;
       }
 
-      const axial = preset.axialOpening ?? {};
-      const axialEnabled = axial.enabled !== false;
-      const axialAmount = axialEnabled ? openingStateLevel : 0;
-      const axialPulse =
-        0.72 +
-        Math.max(0, Math.sin(t * (axial.pulseSpeed ?? 1.1))) * 0.28;
-
-      axialRoot.visible = axialAmount > 0.018;
-
-      if (axialRoot.visible) {
-        axialRoot.rotation.z +=
-          deltaSeconds * (axial.rotationSpeed ?? 0.0) * (0.25 + axialAmount);
-
-        axialRoot.scale.setScalar(
-          1 + axialAmount * (axial.scaleBoost ?? 0.05)
-        );
-      }
-
-      axialCoreBeam.material.opacity =
-        axialAmount * (axial.coreOpacity ?? 0.12) * axialPulse;
-
-      axialDepthBeam.material.opacity =
-        axialAmount * (axial.veilOpacity ?? 0.035) * axialPulse;
-
-      axialSideBeamLeft.material.opacity =
-        axialAmount * (axial.sideOpacity ?? 0.0) * axialPulse;
-
-      axialSideBeamRight.material.opacity =
-        axialAmount * (axial.sideOpacity ?? 0.0) * axialPulse;
-
-      axialVeil.material.opacity =
-        axialAmount * (axial.veilOpacity ?? 0.035) * axialPulse;
-
-      axialFloorWave.visible = axialAmount > 0.018;
-      axialFloorWave.material.opacity =
-        axialAmount * (axial.floorWaveOpacity ?? 0.06) * axialPulse;
-
       const responseBreath =
         1 +
         Math.sin(t * (spaceResponse.breathSpeed ?? 0.7)) *
           (spaceResponse.breathAmplitude ?? 0.08);
 
-      axialFloorWave.scale.setScalar(
-        0.92 +
-          axialAmount * (0.08 + (spaceResponse.floorBreathBoost ?? 0.08)) +
-          Math.max(0, Math.sin(t * 0.65)) * 0.025
-      );
-
       if (atmosphere && atmospherePreset?.enabled) {
         const breathMix =
-          0.5 + 0.5 * Math.sin(t * atmospherePreset.breath.speed);
+          0.5 + 0.5 * Math.sin(t * (atmospherePreset.atmosphereBreathSpeed ?? atmospherePreset.breath.speed));
+        const hazeBoost =
+          1 + openingStateLevel * Math.max(0, atmospherePreset.localHazePostOpenBoost ?? 0);
 
         updateSanctuaryDustLayer(atmosphere.foregroundDust, t, breathMix);
         updateSanctuaryDustLayer(atmosphere.midDust, t * 0.9, breathMix);
         updateSanctuaryDustLayer(atmosphere.backgroundDust, t * 0.75, breathMix);
+        updateSanctuaryDustLayer(atmosphere.mist, t * 1.05, breathMix * 1.1);
 
-        atmosphere.nearHaze.material.opacity =
-          atmospherePreset.haze.nearOpacity * (0.88 + breathMix * 0.35);
+        atmosphere.atmosphereDust.material.opacity =
+          (atmospherePreset.atmosphereDustOpacity ?? 0.058) *
+          (0.72 + breathMix * 0.28) *
+          hazeBoost;
 
-        atmosphere.midHaze.material.opacity =
-          atmospherePreset.haze.midOpacity * (0.9 + breathMix * 0.28);
+        atmosphere.atmosphereDust.material.size =
+          (atmospherePreset.atmosphereDustCount ?? 168) > 0
+            ? 0.015 * (0.94 + breathMix * 0.08)
+            : 0.015;
 
-        atmosphere.farHaze.material.opacity =
-          atmospherePreset.haze.farOpacity * (0.95 + breathMix * 0.18);
+        atmosphere.root.rotation.y += 0.00018;
+      }
 
-        const glowOpacity =
-          atmospherePreset.breath.glowOpacityMin +
-          (atmospherePreset.breath.glowOpacityMax -
-            atmospherePreset.breath.glowOpacityMin) *
-            breathMix;
+      if (localPresence && localPresencePreset?.enabled) {
+        const openPresence = THREE.MathUtils.smoothstep(
+          openingStateLevel,
+          localPresencePreset.startAtOpen ?? 0.1,
+          1
+        );
+        const presenceBase = THREE.MathUtils.clamp(
+          proximityLevel * 0.5 +
+            handAttunementLevel * 0.28 +
+            openingStateLevel * 0.45,
+          0,
+          1
+        );
+        const presenceBoost =
+          1 +
+          openingStateLevel * 0.2 +
+          transformationCueLevel * 0.08 +
+          openPresence * 0.12;
+        const presenceBreath =
+          0.5 + 0.5 * Math.sin(t * (localPresencePreset.breathSpeed ?? 0.55));
 
-        atmosphere.breathingGlow.material.opacity = glowOpacity;
+        localPresence.root.visible = presenceBase > 0.01 || openPresence > 0.01;
 
-        const glowScale = 1 + breathMix * atmospherePreset.breath.glowScaleAmp;
-        atmosphere.breathingGlow.scale.set(
-          glowScale,
-          (atmospherePreset.breath.glowRadius * 0.72 /
-            atmospherePreset.breath.glowRadius) * glowScale,
-          glowScale
+        updateSanctuaryDustLayer(
+          localPresence.near,
+          t * 0.98,
+          presenceBase * presenceBoost * (0.84 + presenceBreath * 0.16)
+        );
+        updateSanctuaryDustLayer(
+          localPresence.far,
+          t * 0.84,
+          presenceBase * presenceBoost * (0.8 + presenceBreath * 0.2)
+        );
+        updateSanctuaryDustLayer(
+          localPresence.haze,
+          t * 0.78,
+          presenceBase * presenceBoost * (0.74 + presenceBreath * 0.26)
         );
 
-        atmosphere.root.rotation.y += 0.00035;
+        localPresence.near.material.opacity =
+          (localPresencePreset.nearOpacity ?? 0.07) *
+          presenceBase *
+          presenceBoost *
+          (0.82 + presenceBreath * 0.3);
+
+        localPresence.far.material.opacity =
+          (localPresencePreset.farOpacity ?? 0.042) *
+          presenceBase *
+          presenceBoost *
+          (0.8 + presenceBreath * 0.26);
+
+        localPresence.haze.material.opacity =
+          (localPresencePreset.hazeOpacity ?? 0.026) *
+          Math.max(presenceBase, openPresence * 0.85) *
+          presenceBoost *
+          (0.68 + presenceBreath * 0.32);
+
+        const presenceScale =
+          1 +
+          presenceBase * (localPresencePreset.scaleAmp ?? 0.045) +
+          Math.max(0, presenceBreath) * 0.014 +
+          openPresence * 0.012;
+
+        localPresence.root.scale.setScalar(presenceScale);
+        localPresence.root.rotation.y +=
+          (localPresencePreset.spin ?? 0.0003) * (0.8 + presenceBase * 0.6);
       }
 
       // ---------------------------------------------
@@ -1393,7 +1491,7 @@ export function createTempleSanctuary() {
 
       const dissolveAmount = chamberReleaseAmount;
 
-      chamberRoot.visible = dissolveAmount < (chamberDissolve.hideAt ?? 0.94);
+      chamberRoot.visible = dissolveAmount < (chamberDissolve.hideAt ?? 0.992);
 
       for (const entry of chamberVisualEntries) {
         const mat = entry.material;
@@ -1406,11 +1504,11 @@ export function createTempleSanctuary() {
           lowerName.includes("core") || lowerName.includes("inner");
 
         const targetFade = isCoreLike
-          ? chamberDissolve.coreFadeTo ?? 0.04
-          : chamberDissolve.shellFadeTo ?? 0.14;
+          ? chamberDissolve.coreFadeTo ?? 0.015
+          : chamberDissolve.shellFadeTo ?? 0.03;
 
         mat.opacity =
-          dissolveAmount >= (chamberDissolve.hideAt ?? 0.94)
+          dissolveAmount >= (chamberDissolve.hideAt ?? 0.992)
             ? 0
             : THREE.MathUtils.lerp(
                 entry.baseOpacity,
@@ -1420,17 +1518,30 @@ export function createTempleSanctuary() {
       }
 
       chamberDissolvePoints.visible = dissolveAmount > 0.01;
+      const dissolveRise = THREE.MathUtils.smoothstep(
+        dissolveAmount,
+        0.08,
+        0.42
+      );
+      const dissolveTail = 1 - THREE.MathUtils.smoothstep(dissolveAmount, 0.84, 1);
       dissolveMaterial.opacity =
-        dissolveAmount * (chamberDissolve.particleOpacity ?? 0.88);
+        (chamberDissolve.particleOpacity ?? 0.72) *
+        (0.12 + dissolveRise * 0.88) *
+        (0.72 + dissolveTail * 0.28);
       dissolveMaterial.size =
-        (chamberDissolve.particleSize ?? 0.03) *
-        (0.92 + responseBreath * 0.12);
+        (chamberDissolve.particleSize ?? 0.018) *
+        (0.9 + responseBreath * 0.12);
 
       if (chamberDissolvePoints.visible) {
         const attr = dissolveGeometry.getAttribute("position");
-        const spread = dissolveAmount * (chamberDissolve.outwardDistance ?? 1.9);
-        const liftBase = dissolveAmount * (chamberDissolve.upwardLift ?? 0.48);
-        const wobble = (chamberDissolve.wobble ?? 0.045) * dissolveAmount;
+        const spread =
+          Math.pow(dissolveAmount, 1.16) *
+          (chamberDissolve.outwardDistance ?? 3.15);
+        const liftBase =
+          Math.pow(dissolveAmount, 1.1) *
+          (chamberDissolve.upwardLift ?? 0.68);
+        const wobble =
+          (chamberDissolve.wobble ?? 0.06) * (0.55 + dissolveAmount * 0.45);
 
         for (let i = 0; i < dissolveParticleCount; i += 1) {
           const ix = i * 3 + 0;
@@ -1478,33 +1589,60 @@ export function createTempleSanctuary() {
       );
 
       const portalAmount = transitionPortalOpenAmount;
-      const portalPulse =
-        0.72 +
-        Math.max(0, Math.sin(t * (transitionPortal.pulseSpeed ?? 1.35))) * 0.28;
+      const portalBreathSpeed =
+        transitionPortal.portalBreathSpeed ?? transitionPortal.pulseSpeed ?? 1.35;
+      const portalBreath = 0.5 + 0.5 * Math.sin(t * portalBreathSpeed);
+      const portalPulse = 0.84 + portalBreath * 0.16;
+      const portalOuterSpeed =
+        transitionPortal.portalRotationSpeedOuter ??
+        transitionPortal.rotationSpeed ??
+        0.06;
+      const portalInnerSpeed =
+        transitionPortal.portalRotationSpeedInner ??
+        Math.max(0.024, portalOuterSpeed * 1.7);
+      const portalPullStrength = transitionPortal.portalPullStrength ?? 0.26;
+      const portalDepthOpacity =
+        transitionPortal.portalDepthOpacity ?? transitionPortal.coreOpacity ?? 0.36;
 
       transitionPortalRoot.visible = portalAmount > 0.015;
 
       if (transitionPortalRoot.visible) {
         transitionPortalRoot.rotation.z +=
           deltaSeconds *
-          (transitionPortal.rotationSpeed ?? 0.16) *
+          portalOuterSpeed *
+          0.16 *
           (0.35 + portalAmount);
 
-        transitionPortalRoot.scale.setScalar(0.72 + portalAmount * 0.38);
+        transitionPortalRoot.scale.setScalar(
+          0.72 + portalAmount * 0.38 + portalBreath * 0.018
+        );
       }
 
       transitionPortalCore.material.opacity =
-        portalAmount * (transitionPortal.coreOpacity ?? 0.36) * portalPulse;
+        portalAmount * portalDepthOpacity * portalPulse;
+      transitionPortalCore.position.z = -0.04 - portalAmount * 0.05;
+      transitionPortalCore.scale.setScalar(1 + portalAmount * 0.045 + portalBreath * 0.02);
 
       transitionPortalRing.material.opacity =
         portalAmount * (transitionPortal.ringOpacity ?? 0.34) * portalPulse;
+      transitionPortalRing.rotation.z += deltaSeconds * portalOuterSpeed * portalAmount;
+      transitionPortalRing.scale.setScalar(1 + portalBreath * 0.012);
+      transitionPortalRing.position.z = portalAmount * 0.006;
 
       transitionPortalInnerRing.material.opacity =
-        portalAmount * (transitionPortal.innerRingOpacity ?? 0.22) * portalPulse;
+        portalAmount *
+        (transitionPortal.innerRingOpacity ?? 0.22) *
+        (0.92 + portalBreath * 0.08);
+      transitionPortalInnerRing.rotation.z -=
+        deltaSeconds * portalInnerSpeed * portalAmount;
+      transitionPortalInnerRing.scale.setScalar(1 + portalBreath * 0.02);
+      transitionPortalInnerRing.position.z = -0.02 - portalAmount * 0.015;
 
       transitionPortalParticles.visible = portalAmount > 0.025;
       transitionPortalParticleMaterial.opacity =
-        portalAmount * (transitionPortal.particleOpacity ?? 0.42) * portalPulse;
+        portalAmount *
+        (transitionPortal.portalParticleOpacity ?? transitionPortal.particleOpacity ?? 0.42) *
+        portalPulse;
 
       if (transitionPortalParticles.visible) {
         transitionPortalParticles.rotation.z -=
@@ -1513,26 +1651,28 @@ export function createTempleSanctuary() {
           (0.2 + portalAmount);
 
         const portalAttr = transitionPortalParticleGeometry.getAttribute("position");
+        const portalParticlePull = portalAmount * portalPullStrength;
+        const portalParticleSwirl = 0.018 + portalAmount * 0.022;
 
         for (let i = 0; i < portalParticleCount; i += 1) {
           const ix = i * 3 + 0;
           const iy = i * 3 + 1;
           const iz = i * 3 + 2;
           const phase = portalParticlePhase[i];
-          const inward = portalAmount * 0.22;
 
           portalParticlePositions[ix] =
-            portalParticleBasePositions[ix] * (1 - inward) +
-            Math.sin(t * 0.9 + phase) * 0.035 * portalAmount;
+            portalParticleBasePositions[ix] * (1 - portalParticlePull * 0.42) +
+            Math.cos(t * 0.86 + phase) * portalParticleSwirl;
 
           portalParticlePositions[iy] =
-            portalParticleBasePositions[iy] * (1 - inward) +
-            Math.cos(t * 0.75 + phase) * 0.028 * portalAmount;
+            portalParticleBasePositions[iy] * (1 - portalParticlePull * 0.18) +
+            Math.sin(t * 0.74 + phase) * portalParticleSwirl * 0.84;
 
           portalParticlePositions[iz] =
             portalParticleBasePositions[iz] -
-            portalAmount * 0.46 +
-            Math.sin(t * 0.55 + phase) * 0.06 * portalAmount;
+            portalAmount * 0.46 -
+            portalParticlePull * 0.28 +
+            Math.sin(t * 0.54 + phase) * portalParticleSwirl * 0.66;
         }
 
         portalAttr.needsUpdate = true;
