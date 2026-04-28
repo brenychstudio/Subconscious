@@ -1398,6 +1398,116 @@ export function createTempleSanctuary() {
   firstPassageLight.position.set(0, 0, -0.72);
   firstPassageRoot.add(firstPassageLight);
 
+  // SCENE01-THRESHOLD-10E - Passage Prompt / Enter Scene 02 Readiness.
+  // Visual prompt only. No teleport, no room switch, no sky/global changes.
+  function createPassagePromptTexture() {
+    if (typeof document === "undefined") return null;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 256;
+
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    gradient.addColorStop(0, "rgba(160,190,255,0)");
+    gradient.addColorStop(0.22, "rgba(210,230,255,0.52)");
+    gradient.addColorStop(0.5, "rgba(245,250,255,0.88)");
+    gradient.addColorStop(0.78, "rgba(210,230,255,0.52)");
+    gradient.addColorStop(1, "rgba(160,190,255,0)");
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(176, 128, 672, 1);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.font = "500 42px Inter, Arial, sans-serif";
+    ctx.letterSpacing = "0.18em";
+    ctx.fillStyle = "rgba(238,246,255,0.92)";
+    ctx.fillText("PASSAGE READY", canvas.width / 2, 92);
+
+    ctx.font = "400 22px Inter, Arial, sans-serif";
+    ctx.fillStyle = "rgba(188,214,255,0.68)";
+    ctx.fillText("MOVE FORWARD", canvas.width / 2, 154);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+
+    return texture;
+  }
+
+  const passagePromptRoot = new THREE.Group();
+  passagePromptRoot.name = "TempleSanctuaryPassagePromptRoot";
+  passagePromptRoot.visible = false;
+  passagePromptRoot.position.set(0, -0.92, 0.34);
+  transitionPortalRoot.add(passagePromptRoot);
+
+  const passagePromptTexture = createPassagePromptTexture();
+
+  const passagePromptSprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: passagePromptTexture,
+      color: new THREE.Color("#ffffff"),
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    })
+  );
+  passagePromptSprite.name = "TempleSanctuaryPassagePromptSprite";
+  passagePromptSprite.scale.set(1.28, 0.32, 1);
+  passagePromptSprite.renderOrder = 110;
+  passagePromptRoot.add(passagePromptSprite);
+
+  const passagePromptNeedles = new THREE.Group();
+  passagePromptNeedles.name = "TempleSanctuaryPassagePromptNeedles";
+  passagePromptNeedles.position.set(0, 0.02, 0.02);
+  passagePromptRoot.add(passagePromptNeedles);
+
+  function createPassagePromptNeedle(x, y, length = 0.18, width = 0.009) {
+    const needle = new THREE.Mesh(
+      new THREE.BoxGeometry(length, width, 0.01),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color("#e8f2ff"),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    );
+
+    needle.position.set(x, y, 0);
+    return needle;
+  }
+
+  passagePromptNeedles.add(
+    createPassagePromptNeedle(-0.72, 0, 0.18, 0.008),
+    createPassagePromptNeedle(0.72, 0, 0.18, 0.008),
+    createPassagePromptNeedle(-0.54, -0.12, 0.1, 0.006),
+    createPassagePromptNeedle(0.54, -0.12, 0.1, 0.006)
+  );
+
+  const passagePromptLight = new THREE.PointLight(
+    new THREE.Color("#dceaff"),
+    0,
+    2.6,
+    1.8
+  );
+  passagePromptLight.name = "TempleSanctuaryPassagePromptLight";
+  passagePromptLight.position.set(0, -0.18, 0.26);
+  passagePromptRoot.add(passagePromptLight);
+
   // SCENE01-PORTAL-09D.2 - small luminous ticks make ring rotation readable.
   // Full circles rotate invisibly, so these restrained markers reveal mechanism motion.
   const transitionPortalMechanismMarkers = new THREE.Group();
@@ -1522,6 +1632,8 @@ export function createTempleSanctuary() {
   let firstPassageHoldTime = 0;
   let firstPassageTriggered = false;
   let firstPassageLevel = 0;
+  let passagePromptLevel = 0;
+  let enterReadinessLevel = 0;
 
   const chamberWorldPosition = new THREE.Vector3();
   const cameraWorldPosition = new THREE.Vector3();
@@ -1534,6 +1646,9 @@ export function createTempleSanctuary() {
     canTransition: false,
     firstPassageTriggered: false,
     firstPassageLevel: 0,
+    enterReady: false,
+    enterReadiness: 0,
+    promptVisible: false,
     hold: 0,
     readiness: 0,
     proximity: 0,
@@ -2548,16 +2663,98 @@ export function createTempleSanctuary() {
         passageParticleMaterial.opacity += firstPassageLevel * 0.16;
       }
 
+      // SCENE01-THRESHOLD-10E - passage prompt / enter readiness.
+      // This prepares the UX for Scene 02 without performing navigation yet.
+      const enterReadyTarget =
+        firstPassageTriggered && firstPassageLevel > 0.62 && transitionZoneLevel > 0.54
+          ? 1
+          : 0;
+
+      enterReadinessLevel = THREE.MathUtils.lerp(
+        enterReadinessLevel,
+        enterReadyTarget,
+        0.055
+      );
+
+      const promptTarget = firstPassageTriggered ? 1 : 0;
+
+      passagePromptLevel = THREE.MathUtils.lerp(
+        passagePromptLevel,
+        promptTarget,
+        0.04
+      );
+
+      const promptBreath = 0.5 + 0.5 * Math.sin(t * 0.52);
+      const enterPulse = THREE.MathUtils.lerp(0.82, 1.16, promptBreath);
+      const promptPresence = Math.max(passagePromptLevel * 0.66, enterReadinessLevel);
+
+      passagePromptRoot.visible = passagePromptLevel > 0.025;
+
+      if (passagePromptRoot.visible) {
+        passagePromptRoot.position.y =
+          -0.92 + Math.sin(t * 0.38) * 0.018 * passagePromptLevel;
+
+        passagePromptRoot.scale.setScalar(
+          THREE.MathUtils.lerp(0.92, 1.04, enterReadinessLevel)
+        );
+
+        passagePromptSprite.material.opacity =
+          passagePromptLevel * THREE.MathUtils.lerp(0.22, 0.46, promptBreath) +
+          enterReadinessLevel * 0.22;
+
+        passagePromptNeedles.rotation.z +=
+          deltaSeconds * THREE.MathUtils.lerp(0.018, 0.082, enterReadinessLevel);
+
+        passagePromptNeedles.children.forEach((needle, index) => {
+          needle.material.opacity =
+            passagePromptLevel *
+              THREE.MathUtils.lerp(0.12, 0.38, promptBreath) *
+              (index < 2 ? 1 : 0.62) +
+            enterReadinessLevel * 0.24;
+        });
+
+        passagePromptLight.intensity =
+          promptPresence * THREE.MathUtils.lerp(0.04, 0.28, promptBreath);
+
+        passagePromptLight.distance =
+          THREE.MathUtils.lerp(1.4, 3.0, promptPresence);
+
+        // When enter readiness is active, reinforce the existing readiness zone.
+        transitionReadinessRing.material.opacity += enterReadinessLevel * 0.14;
+        transitionReadinessInnerRing.material.opacity += enterReadinessLevel * 0.18;
+        transitionReadinessGlow.intensity += enterReadinessLevel * 0.16;
+
+        // The passage field becomes more persuasive, but still restrained.
+        thresholdPullMaterial.opacity += enterReadinessLevel * 0.12;
+        firstPassageStreakMaterial.opacity += enterReadinessLevel * 0.12;
+
+        transitionPortalLight.intensity +=
+          enterReadinessLevel * THREE.MathUtils.lerp(0.1, 0.28, promptBreath);
+
+        firstPassageLight.intensity +=
+          enterReadinessLevel * THREE.MathUtils.lerp(0.08, 0.24, promptBreath);
+      }
+
+      // Public readiness state for future Scene 02 trigger.
+      // This still does not trigger navigation yet.
       root.userData.scene01Transition = {
         ready: transitionReadinessLevel > 0.72,
         inZone: transitionZoneLevel > 0.68,
         canTransition: canStartFirstPassage,
         firstPassageTriggered,
         firstPassageLevel,
+        enterReady: enterReadinessLevel > 0.72,
+        enterReadiness: enterReadinessLevel,
+        promptVisible: passagePromptLevel > 0.2,
         hold: firstPassageHoldTime,
         readiness: transitionReadinessLevel,
         proximity: transitionZoneLevel,
-        phase: firstPassageTriggered ? "first-passage" : "threshold-ready",
+        phase:
+          enterReadinessLevel > 0.72
+            ? "enter-ready"
+            : firstPassageTriggered
+              ? "first-passage"
+              : "threshold-ready",
       };
 
       transitionPortalParticles.visible = portalAmount > 0.025;
@@ -2628,6 +2825,9 @@ export function createTempleSanctuary() {
         canTransition: false,
         firstPassageTriggered: false,
         firstPassageLevel: 0,
+        enterReady: false,
+        enterReadiness: 0,
+        promptVisible: false,
         hold: 0,
         readiness: 0,
         proximity: 0,
