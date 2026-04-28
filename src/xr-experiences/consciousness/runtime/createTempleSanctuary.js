@@ -896,6 +896,74 @@ export function createTempleSanctuary() {
   chamberDissolvePoints.visible = false;
   decorRoot.add(chamberDissolvePoints);
 
+  // SCENE01-PORTAL-09D.2 - chamber release particle field.
+  // This is independent from the mesh fade, so the chamber visibly releases into space.
+  const chamberReleaseParticleCount = 520;
+  const chamberReleasePositions = new Float32Array(chamberReleaseParticleCount * 3);
+  const chamberReleaseBasePositions = new Float32Array(chamberReleaseParticleCount * 3);
+  const chamberReleaseVelocities = new Float32Array(chamberReleaseParticleCount * 3);
+  const chamberReleasePhases = new Float32Array(chamberReleaseParticleCount);
+
+  for (let i = 0; i < chamberReleaseParticleCount; i += 1) {
+    const i3 = i * 3;
+
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 0.32 + Math.random() * 0.58;
+
+    const x = Math.sin(phi) * Math.cos(theta) * r;
+    const y = Math.cos(phi) * r * 0.82 + 0.04;
+    const z = Math.sin(phi) * Math.sin(theta) * r;
+
+    const outward = new THREE.Vector3(x, y * 0.78, z).normalize();
+    const velocityScale = 0.85 + Math.random() * 1.45;
+
+    chamberReleaseBasePositions[i3 + 0] = x;
+    chamberReleaseBasePositions[i3 + 1] = y;
+    chamberReleaseBasePositions[i3 + 2] = z;
+
+    chamberReleasePositions[i3 + 0] = x;
+    chamberReleasePositions[i3 + 1] = y;
+    chamberReleasePositions[i3 + 2] = z;
+
+    chamberReleaseVelocities[i3 + 0] = outward.x * velocityScale;
+    chamberReleaseVelocities[i3 + 1] = (outward.y * 0.55 + 0.42) * velocityScale;
+    chamberReleaseVelocities[i3 + 2] = outward.z * velocityScale;
+
+    chamberReleasePhases[i] = Math.random() * Math.PI * 2;
+  }
+
+  const chamberReleaseGeometry = new THREE.BufferGeometry();
+  chamberReleaseGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(chamberReleasePositions, 3)
+  );
+
+  const chamberReleaseMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.001 : 0,
+    color: new THREE.Color("#f7fbff"),
+    size: 0.082,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    toneMapped: false,
+  });
+
+  const chamberReleaseParticles = new THREE.Points(
+    chamberReleaseGeometry,
+    chamberReleaseMaterial
+  );
+  chamberReleaseParticles.name = "TempleSanctuaryChamberReleaseParticles";
+  chamberReleaseParticles.position.copy(chamberRoot.position);
+  chamberReleaseParticles.visible = false;
+  chamberReleaseParticles.renderOrder = 80;
+  decorRoot.add(chamberReleaseParticles);
+
   const transitionPortal = preset.transitionPortal ?? {};
 
   const transitionPortalRoot = new THREE.Group();
@@ -954,6 +1022,171 @@ export function createTempleSanctuary() {
   transitionPortalInnerRing.name = "TempleSanctuaryTransitionPortalInnerRing";
   transitionPortalInnerRing.position.z = -0.02;
   transitionPortalRoot.add(transitionPortalInnerRing);
+
+  const transitionPortalLight = new THREE.PointLight(
+    new THREE.Color("#bcd6ff"),
+    0,
+    4.8,
+    1.65
+  );
+  transitionPortalLight.name = "TempleSanctuaryTransitionPortalLivingLight";
+  transitionPortalLight.position.set(0, 0, 0.28);
+  transitionPortalRoot.add(transitionPortalLight);
+
+  // SCENE01-THRESHOLD-10A - Passage Aperture / Depth Gate.
+  // A local portal-depth structure. No sky, room state, XRRoot, or global environment changes.
+  const passageRoot = new THREE.Group();
+  passageRoot.name = "TempleSanctuaryPassageAperture";
+  passageRoot.visible = false;
+  passageRoot.position.set(0, 0, -0.18);
+  transitionPortalRoot.add(passageRoot);
+
+  const passageCoreMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#02050b"),
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.NormalBlending,
+    toneMapped: false,
+  });
+
+  const passageCore = new THREE.Mesh(
+    new THREE.CircleGeometry(0.56, 96),
+    passageCoreMaterial
+  );
+  passageCore.name = "TempleSanctuaryPassageApertureCore";
+  passageCore.position.z = -0.18;
+  passageCore.renderOrder = 42;
+  passageRoot.add(passageCore);
+
+  const passageDepthRings = [];
+  const passageDepthRingSpecs = [
+    { radius: 0.52, z: -0.22, tube: 0.006, opacity: 0.22, speed: 0.075 },
+    { radius: 0.72, z: -0.48, tube: 0.005, opacity: 0.16, speed: -0.052 },
+    { radius: 0.94, z: -0.82, tube: 0.004, opacity: 0.11, speed: 0.034 },
+  ];
+
+  passageDepthRingSpecs.forEach((spec, index) => {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(spec.radius, spec.tube, 8, 128),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(index === 0 ? "#dceaff" : "#8fb4ff"),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    );
+
+    ring.name = `TempleSanctuaryPassageDepthRing_${index}`;
+    ring.position.z = spec.z;
+    ring.renderOrder = 43 + index;
+    passageRoot.add(ring);
+
+    passageDepthRings.push({ ring, ...spec });
+  });
+
+  const passageParticleCount = 180;
+  const passageParticlePositions = new Float32Array(passageParticleCount * 3);
+  const passageParticleBasePositions = new Float32Array(passageParticleCount * 3);
+  const passageParticlePhases = new Float32Array(passageParticleCount);
+
+  for (let i = 0; i < passageParticleCount; i += 1) {
+    const i3 = i * 3;
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 0.18 + Math.random() * 1.05;
+    const depth = -0.15 - Math.random() * 1.65;
+
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius * 0.78;
+    const z = depth;
+
+    passageParticleBasePositions[i3 + 0] = x;
+    passageParticleBasePositions[i3 + 1] = y;
+    passageParticleBasePositions[i3 + 2] = z;
+
+    passageParticlePositions[i3 + 0] = x;
+    passageParticlePositions[i3 + 1] = y;
+    passageParticlePositions[i3 + 2] = z;
+
+    passageParticlePhases[i] = Math.random() * Math.PI * 2;
+  }
+
+  const passageParticleGeometry = new THREE.BufferGeometry();
+  passageParticleGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(passageParticlePositions, 3)
+  );
+
+  const passageParticleMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.001 : 0,
+    color: new THREE.Color("#dceaff"),
+    size: 0.048,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    toneMapped: false,
+  });
+
+  const passageParticles = new THREE.Points(
+    passageParticleGeometry,
+    passageParticleMaterial
+  );
+  passageParticles.name = "TempleSanctuaryPassagePullParticles";
+  passageParticles.visible = false;
+  passageParticles.renderOrder = 84;
+  passageRoot.add(passageParticles);
+
+  // SCENE01-PORTAL-09D.2 - small luminous ticks make ring rotation readable.
+  // Full circles rotate invisibly, so these restrained markers reveal mechanism motion.
+  const transitionPortalMechanismMarkers = new THREE.Group();
+  transitionPortalMechanismMarkers.name = "TempleSanctuaryTransitionPortalMechanismMarkers";
+  transitionPortalMechanismMarkers.visible = false;
+  transitionPortalRoot.add(transitionPortalMechanismMarkers);
+
+  function createPortalMechanismTick(radius, angle, length = 0.16, width = 0.012) {
+    const tick = new THREE.Mesh(
+      new THREE.BoxGeometry(length, width, 0.01),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color("#e8f2ff"),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    );
+
+    tick.position.set(
+      Math.cos(angle) * radius,
+      Math.sin(angle) * radius,
+      0.07
+    );
+
+    tick.rotation.z = angle + Math.PI * 0.5;
+    return tick;
+  }
+
+  for (let i = 0; i < 8; i += 1) {
+    const angle = (i / 8) * Math.PI * 2;
+    transitionPortalMechanismMarkers.add(
+      createPortalMechanismTick(transitionPortal.radius ?? 1.22, angle, 0.18, 0.012)
+    );
+  }
+
+  for (let i = 0; i < 5; i += 1) {
+    const angle = (i / 5) * Math.PI * 2 + Math.PI * 0.18;
+    transitionPortalMechanismMarkers.add(
+      createPortalMechanismTick(transitionPortal.innerRadius ?? 0.62, angle, 0.11, 0.01)
+    );
+  }
 
   const portalParticleCount =
     transitionPortal.portalParticleCount ?? transitionPortal.particleCount ?? 240;
@@ -1491,6 +1724,54 @@ export function createTempleSanctuary() {
 
       const dissolveAmount = chamberReleaseAmount;
 
+      // SCENE01-PORTAL-09D.2 - visible release field.
+      // Makes the chamber feel like it dissolves into space instead of only scaling away.
+      const releaseAmount = THREE.MathUtils.smoothstep(dissolveAmount, 0.015, 0.82);
+
+      // Keep the release visible longer. This should feel like the chamber is dissolving
+      // into the room, not like particles appear for one moment and vanish.
+      const releaseFade = THREE.MathUtils.smoothstep(dissolveAmount, 1.15, 1.55);
+      const releasePresence = releaseAmount * (1 - releaseFade * 0.18);
+
+      chamberReleaseParticles.visible = releasePresence > 0.006;
+      chamberReleaseMaterial.opacity = releasePresence * 1.35;
+
+      if (chamberReleaseParticles.visible) {
+        const releaseAttr = chamberReleaseGeometry.getAttribute("position");
+        const expansion = releaseAmount * 5.4;
+        const lateExpansion = THREE.MathUtils.smoothstep(dissolveAmount, 0.24, 1.0) * 2.6;
+
+        for (let i = 0; i < chamberReleaseParticleCount; i += 1) {
+          const i3 = i * 3;
+          const phase = chamberReleasePhases[i];
+
+          const wobbleX = Math.sin(t * 0.72 + phase) * 0.035 * releaseAmount;
+          const wobbleY = Math.cos(t * 0.58 + phase * 1.3) * 0.028 * releaseAmount;
+          const wobbleZ = Math.sin(t * 0.49 + phase * 0.8) * 0.035 * releaseAmount;
+
+          chamberReleasePositions[i3 + 0] =
+            chamberReleaseBasePositions[i3 + 0] +
+            chamberReleaseVelocities[i3 + 0] * (expansion + lateExpansion) +
+            wobbleX;
+
+          chamberReleasePositions[i3 + 1] =
+            chamberReleaseBasePositions[i3 + 1] +
+            chamberReleaseVelocities[i3 + 1] * (expansion * 0.72 + lateExpansion * 0.55) +
+            wobbleY;
+
+          chamberReleasePositions[i3 + 2] =
+            chamberReleaseBasePositions[i3 + 2] +
+            chamberReleaseVelocities[i3 + 2] * (expansion + lateExpansion) +
+            wobbleZ;
+        }
+
+        releaseAttr.needsUpdate = true;
+
+        // Very slow rotation keeps the released field alive without becoming an effect storm.
+        chamberReleaseParticles.rotation.y += deltaSeconds * 0.045 * releaseAmount;
+        chamberReleaseParticles.rotation.z -= deltaSeconds * 0.018 * releaseAmount;
+      }
+
       chamberRoot.visible = dissolveAmount < (chamberDissolve.hideAt ?? 0.992);
 
       for (const entry of chamberVisualEntries) {
@@ -1637,6 +1918,123 @@ export function createTempleSanctuary() {
         deltaSeconds * portalInnerSpeed * portalAmount;
       transitionPortalInnerRing.scale.setScalar(1 + portalBreath * 0.02);
       transitionPortalInnerRing.position.z = -0.02 - portalAmount * 0.015;
+
+      // SCENE01-PORTAL-09D.1 - mechanism rings + living light.
+      // Local-only visual pass. Does not touch sky, E input, threshold logic, or dissolve.
+      const mechanismBreath = 0.5 + 0.5 * Math.sin(t * 0.72);
+      const mechanismAmount = portalAmount * (0.76 + mechanismBreath * 0.24);
+
+      // Slow ritual mechanism motion: layered, restrained, readable.
+      transitionPortalRing.rotation.z += deltaSeconds * 0.055 * mechanismAmount;
+      transitionPortalInnerRing.rotation.z -= deltaSeconds * 0.088 * mechanismAmount;
+
+      // Subtle living opacity variation. No flashing, no overexposure.
+      transitionPortalRing.material.opacity =
+        portalAmount * THREE.MathUtils.lerp(0.26, 0.46, mechanismBreath);
+
+      transitionPortalInnerRing.material.opacity =
+        portalAmount * THREE.MathUtils.lerp(0.16, 0.34, 1 - mechanismBreath);
+
+      // Keep the dark center present but gently breathing.
+      transitionPortalCore.material.opacity =
+        portalAmount * THREE.MathUtils.lerp(0.12, 0.24, mechanismBreath);
+
+      // Local light only. This gives the portal a living presence without brightening the whole world.
+      transitionPortalLight.intensity =
+        portalAmount * THREE.MathUtils.lerp(0.34, 1.15, mechanismBreath);
+
+      transitionPortalLight.distance =
+        THREE.MathUtils.lerp(3.2, 5.2, portalAmount);
+
+      transitionPortalLight.color.lerpColors(
+        new THREE.Color("#8fb4ff"),
+        new THREE.Color("#edf6ff"),
+        mechanismBreath * 0.55
+      );
+
+      // Visible mechanism markers: this makes the rotation readable even on perfect circles.
+      transitionPortalMechanismMarkers.visible = portalAmount > 0.012;
+      transitionPortalMechanismMarkers.rotation.z += deltaSeconds * 0.34 * mechanismAmount;
+
+      transitionPortalMechanismMarkers.children.forEach((marker, index) => {
+        marker.material.opacity =
+          portalAmount *
+          THREE.MathUtils.lerp(0.38, 0.92, mechanismBreath) *
+          (index % 3 === 0 ? 0.7 : 1);
+      });
+
+      // SCENE01-THRESHOLD-10A - animated depth aperture.
+      // This turns the opened threshold into a directional passage without creating a new scene.
+      const passageAmount = THREE.MathUtils.smoothstep(portalAmount, 0.08, 0.92);
+      const passageBreath = 0.5 + 0.5 * Math.sin(t * 0.54);
+      const passagePulse = THREE.MathUtils.lerp(0.82, 1.16, passageBreath);
+
+      passageRoot.visible = passageAmount > 0.015;
+
+      if (passageRoot.visible) {
+        // The aperture sits slightly behind the ring plane and grows into readability.
+        passageRoot.scale.setScalar(THREE.MathUtils.lerp(0.82, 1.08, passageAmount));
+
+        passageCoreMaterial.opacity =
+          passageAmount * THREE.MathUtils.lerp(0.26, 0.48, passageBreath);
+
+        passageCore.scale.setScalar(
+          THREE.MathUtils.lerp(0.82, 1.04, passageBreath) *
+            THREE.MathUtils.lerp(0.78, 1.0, passageAmount)
+        );
+
+        passageDepthRings.forEach((entry, index) => {
+          const localPhase = passageBreath * (index + 1) * 0.18;
+          entry.ring.visible = true;
+          entry.ring.rotation.z += deltaSeconds * entry.speed * passageAmount;
+          entry.ring.material.opacity =
+            passageAmount * entry.opacity * passagePulse * (1 - localPhase * 0.2);
+
+          const scaleBreath =
+            1 + Math.sin(t * 0.42 + index * 1.7) * 0.018 * passageAmount;
+          entry.ring.scale.setScalar(scaleBreath);
+        });
+
+        passageParticles.visible = passageAmount > 0.04;
+        passageParticleMaterial.opacity =
+          passageAmount * THREE.MathUtils.lerp(0.22, 0.58, passageBreath);
+
+        if (passageParticles.visible) {
+          const passageAttr = passageParticleGeometry.getAttribute("position");
+          const pull = passageAmount * THREE.MathUtils.lerp(0.25, 0.72, passageBreath);
+
+          for (let i = 0; i < passageParticleCount; i += 1) {
+            const i3 = i * 3;
+            const phase = passageParticlePhases[i];
+
+            const baseX = passageParticleBasePositions[i3 + 0];
+            const baseY = passageParticleBasePositions[i3 + 1];
+            const baseZ = passageParticleBasePositions[i3 + 2];
+
+            const spiral = t * 0.18 + phase;
+            const inward = 1 - pull * 0.34;
+            const depthPull = pull * 0.72;
+
+            passageParticlePositions[i3 + 0] =
+              baseX * inward +
+              Math.sin(spiral) * 0.035 * passageAmount;
+
+            passageParticlePositions[i3 + 1] =
+              baseY * inward +
+              Math.cos(spiral * 0.85) * 0.028 * passageAmount;
+
+            passageParticlePositions[i3 + 2] =
+              baseZ -
+              depthPull +
+              Math.sin(t * 0.48 + phase) * 0.05 * passageAmount;
+          }
+
+          passageAttr.needsUpdate = true;
+
+          passageParticles.rotation.z -= deltaSeconds * 0.045 * passageAmount;
+          passageParticles.rotation.y += deltaSeconds * 0.018 * passageAmount;
+        }
+      }
 
       transitionPortalParticles.visible = portalAmount > 0.025;
       transitionPortalParticleMaterial.opacity =
