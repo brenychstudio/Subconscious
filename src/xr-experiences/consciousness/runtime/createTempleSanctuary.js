@@ -302,8 +302,67 @@ export function createTempleSanctuary() {
   rearGlow.position.set(0, preset.altar.height + 1.0, -0.52);
   decorRoot.add(rearGlow);
 
+  const thresholdReveal = preset.thresholdReveal ?? {};
+  const thresholdRoot = new THREE.Group();
+  thresholdRoot.name = "TempleSanctuaryThresholdReveal";
+  thresholdRoot.position.set(
+    0,
+    preset.altar.height + (thresholdReveal.y ?? 1.04),
+    thresholdReveal.z ?? -0.92
+  );
+  thresholdRoot.visible = false;
+  decorRoot.add(thresholdRoot);
+
+  const thresholdRing = new THREE.Mesh(
+    new THREE.TorusGeometry(
+      thresholdReveal.radius ?? 1.58,
+      thresholdReveal.tube ?? 0.012,
+      10,
+      144
+    ),
+    makeBasicGlow({
+      color: thresholdReveal.color ?? "#9fbaff",
+      opacity: 0,
+    })
+  );
+  thresholdRing.name = "TempleSanctuaryThresholdRing";
+  thresholdRoot.add(thresholdRing);
+
+  const thresholdOuterRing = new THREE.Mesh(
+    new THREE.TorusGeometry(
+      (thresholdReveal.radius ?? 1.58) * 1.34,
+      (thresholdReveal.tube ?? 0.012) * 0.62,
+      8,
+      144
+    ),
+    makeBasicGlow({
+      color: thresholdReveal.color ?? "#9fbaff",
+      opacity: 0,
+    })
+  );
+  thresholdOuterRing.name = "TempleSanctuaryThresholdOuterRing";
+  thresholdRoot.add(thresholdOuterRing);
+
+  const thresholdVeil = new THREE.Mesh(
+    new THREE.CircleGeometry((thresholdReveal.radius ?? 1.58) * 0.86, 72),
+    makeBasicGlow({
+      color: thresholdReveal.color ?? "#9fbaff",
+      opacity: 0,
+    })
+  );
+  thresholdVeil.name = "TempleSanctuaryThresholdVeil";
+  thresholdVeil.position.z = -0.014;
+  thresholdRoot.add(thresholdVeil);
+
   let t = 0;
   let proximityLevel = 0;
+  let handAttunementTarget = 0;
+  let handAttunementLevel = 0;
+  let ritualChargeLevel = 0;
+  let ritualChargeComplete = false;
+  let transformationCueTriggered = false;
+  let transformationCueLevel = 0;
+
   const chamberWorldPosition = new THREE.Vector3();
   const cameraWorldPosition = new THREE.Vector3();
   const baseChamberScale = preset.chamber.scale ?? 1;
@@ -346,24 +405,90 @@ export function createTempleSanctuary() {
         presence.smoothing ?? 0.055
       );
 
+      const attunement = preset.attunement ?? {};
+      const attunementEnabled = attunement.enabled !== false;
+
+      handAttunementLevel = THREE.MathUtils.lerp(
+        handAttunementLevel,
+        attunementEnabled ? handAttunementTarget : 0,
+        attunement.smoothing ?? 0.075
+      );
+
+      const ritualCharge = preset.ritualCharge ?? {};
+      const ritualChargeEnabled = ritualCharge.enabled !== false;
+
+      const canCharge =
+        ritualChargeEnabled &&
+        handAttunementLevel >= (ritualCharge.handThreshold ?? 0.62) &&
+        proximityLevel >= (ritualCharge.proximityThreshold ?? 0.18);
+
+      if (canCharge) {
+        ritualChargeLevel = THREE.MathUtils.clamp(
+          ritualChargeLevel + deltaSeconds * (ritualCharge.chargeRate ?? 0.34),
+          0,
+          1
+        );
+      } else {
+        ritualChargeLevel = THREE.MathUtils.clamp(
+          ritualChargeLevel - deltaSeconds * (ritualCharge.decayRate ?? 0.22),
+          0,
+          1
+        );
+      }
+
+      ritualChargeComplete =
+        ritualChargeLevel >= (ritualCharge.completeThreshold ?? 0.96);
+
+      const transformationCue = preset.transformationCue ?? {};
+      const transformationCueEnabled = transformationCue.enabled !== false;
+
+      if (transformationCueEnabled && ritualChargeComplete) {
+        transformationCueTriggered = true;
+      }
+
+      const transformationTarget =
+        transformationCueEnabled && transformationCueTriggered ? 1 : 0;
+
+      transformationCueLevel = THREE.MathUtils.lerp(
+        transformationCueLevel,
+        transformationTarget,
+        transformationCue.smoothing ?? 0.035
+      );
+
       const breathSpeed = presence.breathSpeed ?? 1.15;
       const baseBreath = presence.breathAmplitude ?? 0.032;
       const proximityPulseBoost = presence.proximityPulseBoost ?? 0.055;
+      const attunementPulseBoost = attunement.pulseBoost ?? 0.052;
+      const ritualPulseBoost = ritualCharge.pulseBoost ?? 0.075;
+      const transformationPulseBoost = transformationCue.pulseBoost ?? 0.12;
 
       const pulseWave = Math.sin(t * breathSpeed);
       const breath =
         1 +
         pulseWave *
-          (baseBreath * 0.45 + proximityLevel * proximityPulseBoost);
+          (
+            baseBreath * 0.45 +
+            proximityLevel * proximityPulseBoost +
+            handAttunementLevel * attunementPulseBoost +
+            ritualChargeLevel * ritualPulseBoost +
+            transformationCueLevel * transformationPulseBoost
+          );
 
       const proximityScale =
-        baseChamberScale + proximityLevel * (presence.scaleBoost ?? 0.085);
+        baseChamberScale +
+        proximityLevel * (presence.scaleBoost ?? 0.085) +
+        handAttunementLevel * (attunement.scaleBoost ?? 0.038) +
+        ritualChargeLevel * (ritualCharge.scaleBoost ?? 0.045) +
+        transformationCueLevel * (transformationCue.scaleBoost ?? 0.075);
 
       chamberAnchor.scale.setScalar(proximityScale * breath);
 
       const spin =
         preset.chamber.spinSpeed +
-        proximityLevel * (presence.spinBoost ?? 0.14);
+        proximityLevel * (presence.spinBoost ?? 0.14) +
+        handAttunementLevel * (attunement.spinBoost ?? 0.055) +
+        ritualChargeLevel * (ritualCharge.spinBoost ?? 0.09) +
+        transformationCueLevel * (transformationCue.spinBoost ?? 0.16);
 
       chamberAnchor.rotation.y += deltaSeconds * spin;
 
@@ -371,14 +496,93 @@ export function createTempleSanctuary() {
         preset.chamber.lightIntensity +
         Math.sin(t * 0.8) * 0.08 +
         proximityLevel * (presence.lightBoost ?? 2.1) +
+        handAttunementLevel * (attunement.lightBoost ?? 1.25) +
+        ritualChargeLevel * (ritualCharge.lightBoost ?? 1.55) +
+        transformationCueLevel * (transformationCue.lightBoost ?? 2.6) +
         Math.max(0, pulseWave) *
-          proximityLevel *
-          (presence.lightPulseBoost ?? 0.34);
+          (
+            proximityLevel * (presence.lightPulseBoost ?? 0.34) +
+            handAttunementLevel * 0.22 +
+            ritualChargeLevel * 0.38 +
+            transformationCueLevel * 0.5
+          );
 
-      callRing.material.opacity = Math.max(0, preset.callLight.ringOpacity);
-      rearGlow.material.opacity = Math.max(0, preset.callLight.rearGlowOpacity);
+      const cueWave = 0.72 + Math.max(0, pulseWave) * 0.28;
 
-      return proximityLevel;
+      callRing.material.opacity =
+        Math.max(0, preset.callLight.ringOpacity) +
+        transformationCueLevel *
+          (transformationCue.callRingOpacity ?? 0.13) *
+          cueWave;
+
+      rearGlow.material.opacity =
+        Math.max(0, preset.callLight.rearGlowOpacity) +
+        transformationCueLevel *
+          (transformationCue.rearGlowOpacity ?? 0.11) *
+          cueWave;
+
+      const threshold = preset.thresholdReveal ?? {};
+      const thresholdEnabled = threshold.enabled !== false;
+      const thresholdAmount = thresholdEnabled ? transformationCueLevel : 0;
+
+      thresholdRoot.visible = thresholdAmount > 0.012;
+
+      if (thresholdRoot.visible) {
+        thresholdRoot.rotation.z +=
+          deltaSeconds *
+          (threshold.rotationSpeed ?? 0.035) *
+          (0.35 + thresholdAmount);
+
+        thresholdRoot.scale.setScalar(
+          1 + thresholdAmount * (threshold.scaleBoost ?? 0.085)
+        );
+      }
+
+      thresholdRing.material.opacity =
+        thresholdAmount * (threshold.ringOpacity ?? 0.105) * cueWave;
+
+      thresholdOuterRing.material.opacity =
+        thresholdAmount * (threshold.outerRingOpacity ?? 0.045) * cueWave;
+
+      thresholdVeil.material.opacity =
+        thresholdAmount * (threshold.veilOpacity ?? 0.038) * cueWave;
+
+      return Math.max(
+        proximityLevel,
+        handAttunementLevel * (preset.attunement?.soundBoost ?? 0.75),
+        ritualChargeLevel * (preset.ritualCharge?.soundBoost ?? 0.95),
+        transformationCueLevel * (preset.transformationCue?.soundBoost ?? 1.15)
+      );
+    },
+    setHandAttunement(value = 0) {
+      handAttunementTarget = THREE.MathUtils.clamp(value, 0, 1);
+    },
+    getChamberWorldPosition(target = new THREE.Vector3()) {
+      chamberAnchor.getWorldPosition(target);
+      return target;
+    },
+    getHandAttunementLevel() {
+      return handAttunementLevel;
+    },
+    getRitualChargeLevel() {
+      return ritualChargeLevel;
+    },
+    isRitualChargeComplete() {
+      return ritualChargeComplete;
+    },
+    getTransformationCueLevel() {
+      return transformationCueLevel;
+    },
+    isTransformationCueTriggered() {
+      return transformationCueTriggered;
+    },
+    resetRitualCharge() {
+      ritualChargeLevel = 0;
+      ritualChargeComplete = false;
+    },
+    resetTransformationCue() {
+      transformationCueTriggered = false;
+      transformationCueLevel = 0;
     },
     dispose() {
       root.traverse((obj) => {

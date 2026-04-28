@@ -652,6 +652,185 @@ export default function XRRootThree({ manifest, options, xrSupported, xrChecked,
 
     const templeSanctuary = createTempleSanctuary();
     scene.add(templeSanctuary.root);
+    const handAttunementChamberPosition = new THREE.Vector3();
+    const handAttunementSourcePosition = new THREE.Vector3();
+    const desktopAttunementCameraPosition = new THREE.Vector3();
+
+    const desktopAttunementState = {
+      isHolding: false,
+    };
+
+    const DESKTOP_ATTUNEMENT_START_DISTANCE = 8.5;
+    const DESKTOP_ATTUNEMENT_FULL_DISTANCE = 3.2;
+
+    let desktopAttunementHint = null;
+
+    if (typeof document !== "undefined") {
+      desktopAttunementHint = document.createElement("div");
+      desktopAttunementHint.textContent = "HOLD E TO ATTUNE";
+      Object.assign(desktopAttunementHint.style, {
+        position: "fixed",
+        left: "50%",
+        bottom: "92px",
+        transform: "translateX(-50%)",
+        zIndex: "45",
+        padding: "9px 13px",
+        border: "1px solid rgba(180, 205, 255, 0.26)",
+        borderRadius: "999px",
+        background: "rgba(4, 8, 16, 0.62)",
+        color: "rgba(225, 236, 255, 0.86)",
+        fontFamily:
+          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+        fontSize: "10px",
+        letterSpacing: "0.16em",
+        textTransform: "uppercase",
+        pointerEvents: "none",
+        opacity: "0",
+        transition: "opacity 220ms ease, transform 220ms ease",
+        backdropFilter: "blur(10px)",
+      });
+      document.body.appendChild(desktopAttunementHint);
+    }
+
+    const updateDesktopAttunementHint = (value = 0, distance = Infinity) => {
+      if (!desktopAttunementHint) return;
+
+      const isDesktopPreview = !renderer?.xr?.isPresenting;
+      const isNear = distance <= DESKTOP_ATTUNEMENT_START_DISTANCE;
+
+      if (!isDesktopPreview || !isNear) {
+        desktopAttunementHint.style.opacity = "0";
+        desktopAttunementHint.style.transform = "translateX(-50%) translateY(4px)";
+        return;
+      }
+
+      desktopAttunementHint.style.opacity = "1";
+      desktopAttunementHint.style.transform = "translateX(-50%) translateY(0)";
+
+      if (desktopAttunementState.isHolding) {
+        desktopAttunementHint.textContent = `ATTUNING ${Math.round(value * 100)}%`;
+      } else {
+        desktopAttunementHint.textContent = "HOLD E TO ATTUNE";
+      }
+    };
+
+    const shouldIgnoreDesktopAttunementKey = (event) => {
+      const target = event.target;
+      const tagName = target?.tagName?.toLowerCase?.();
+
+      return (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        target?.isContentEditable === true
+      );
+    };
+
+    const handleDesktopAttunementKeyDown = (event) => {
+      if (event.code !== "KeyE") return;
+      if (shouldIgnoreDesktopAttunementKey(event)) return;
+
+      desktopAttunementState.isHolding = true;
+      event.preventDefault();
+    };
+
+    const handleDesktopAttunementKeyUp = (event) => {
+      if (event.code !== "KeyE") return;
+
+      desktopAttunementState.isHolding = false;
+      event.preventDefault();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("keydown", handleDesktopAttunementKeyDown);
+      window.addEventListener("keyup", handleDesktopAttunementKeyUp);
+    }
+
+    const computeHandAttunement = () => {
+      const xr = renderer?.xr;
+      const attunement = templeSanctuaryPreset.attunement ?? {};
+
+      if (attunement.enabled === false) {
+        return 0;
+      }
+
+      templeSanctuary.getChamberWorldPosition?.(handAttunementChamberPosition);
+
+      if (!xr?.isPresenting) {
+        if (!camera || typeof camera.getWorldPosition !== "function") {
+          updateDesktopAttunementHint(0, Infinity);
+          return 0;
+        }
+
+        camera.getWorldPosition(desktopAttunementCameraPosition);
+
+        const distance = desktopAttunementCameraPosition.distanceTo(
+          handAttunementChamberPosition
+        );
+
+        const desktopStartDistance = DESKTOP_ATTUNEMENT_START_DISTANCE;
+        const desktopFullDistance = DESKTOP_ATTUNEMENT_FULL_DISTANCE;
+        const desktopRange = Math.max(
+          0.001,
+          desktopStartDistance - desktopFullDistance
+        );
+
+        const desktopValue =
+          1 -
+          THREE.MathUtils.clamp(
+            (distance - desktopFullDistance) / desktopRange,
+            0,
+            1
+          );
+
+        updateDesktopAttunementHint(desktopValue, distance);
+
+        if (!desktopAttunementState.isHolding) {
+          return 0;
+        }
+
+        return desktopValue;
+      }
+
+      const startDistance = attunement.startDistance ?? 1.65;
+      const fullDistance = attunement.fullDistance ?? 0.42;
+      const range = Math.max(0.001, startDistance - fullDistance);
+
+      let strongest = 0;
+
+      for (let i = 0; i < 2; i += 1) {
+        const grip = xr.getControllerGrip?.(i);
+        const controller = xr.getController?.(i);
+
+        const source = grip ?? controller;
+        if (!source || typeof source.getWorldPosition !== "function") continue;
+
+        source.getWorldPosition(handAttunementSourcePosition);
+
+        const isValid =
+          Number.isFinite(handAttunementSourcePosition.x) &&
+          Number.isFinite(handAttunementSourcePosition.y) &&
+          Number.isFinite(handAttunementSourcePosition.z);
+
+        if (!isValid) continue;
+
+        const distance = handAttunementSourcePosition.distanceTo(
+          handAttunementChamberPosition
+        );
+
+        const value =
+          1 -
+          THREE.MathUtils.clamp(
+            (distance - fullDistance) / range,
+            0,
+            1
+          );
+
+        strongest = Math.max(strongest, value);
+      }
+
+      return strongest;
+    };
 
     const spacing = options?.layout?.spacing ?? 7.2;
     const curveAmp = options?.layout?.curveAmp ?? 0.62;
@@ -1531,9 +1710,15 @@ activeStillRoom = nearest.room;
       locomotion.updateDesktopMove(dtSec);
       locomotion.updateSnapTurn(nowMs);
 
+      const handAttunement = computeHandAttunement();
+
+      templeSanctuary.setHandAttunement?.(handAttunement);
+
       const sanctuaryPresence =
         templeSanctuary.update(dtSec, camera) ?? 0;
-      ritualSound.setSanctuaryPresence?.(sanctuaryPresence);
+      ritualSound.setSanctuaryPresence?.(
+        Math.max(sanctuaryPresence, handAttunement * 0.65)
+      );
       membraneCore.update(dtSec);
       updateRooms(elapsed, latestVoiceState);
       updatePortal(elapsed, dtSec, dtMs, latestVoiceState);
@@ -1609,6 +1794,16 @@ activeStillRoom = nearest.room;
 
     return () => {
       renderer.setAnimationLoop(null);
+
+      if (typeof window !== "undefined") {
+        window.removeEventListener("keydown", handleDesktopAttunementKeyDown);
+        window.removeEventListener("keyup", handleDesktopAttunementKeyUp);
+      }
+
+      if (desktopAttunementHint?.parentNode) {
+        desktopAttunementHint.parentNode.removeChild(desktopAttunementHint);
+      }
+      desktopAttunementHint = null;
 
       try { renderer.xr.removeEventListener("sessionstart", onXRSessionStart); } catch {}
       try { renderer.xr.removeEventListener("sessionend", onXRSessionEnd); } catch {}

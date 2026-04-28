@@ -36,6 +36,74 @@ export const templeSanctuaryPreset = {
     lightPulseBoost: 0.34,
   },
 
+  attunement: {
+    enabled: true,
+    startDistance: 1.65,
+    fullDistance: 0.42,
+    smoothing: 0.075,
+
+    spinBoost: 0.055,
+    lightBoost: 1.75,
+    scaleBoost: 0.055,
+    pulseBoost: 0.075,
+
+    soundBoost: 0.95,
+  },
+
+  ritualCharge: {
+    enabled: true,
+
+    handThreshold: 0.62,
+    proximityThreshold: 0.18,
+
+    chargeRate: 0.42,
+    decayRate: 0.22,
+
+    spinBoost: 0.12,
+    lightBoost: 2.0,
+    scaleBoost: 0.06,
+    pulseBoost: 0.1,
+    soundBoost: 1.1,
+
+    completeThreshold: 0.96,
+  },
+
+  transformationCue: {
+    enabled: true,
+
+    smoothing: 0.035,
+
+    spinBoost: 0.16,
+    lightBoost: 3.4,
+    scaleBoost: 0.095,
+    pulseBoost: 0.16,
+    soundBoost: 1.35,
+
+    callRingOpacity: 0.18,
+    rearGlowOpacity: 0.15,
+
+    holdAfterComplete: true,
+  },
+
+  thresholdReveal: {
+    enabled: true,
+
+    z: -0.92,
+    y: 1.04,
+
+    radius: 1.58,
+    tube: 0.012,
+
+    ringOpacity: 0.16,
+    outerRingOpacity: 0.075,
+    veilOpacity: 0.065,
+
+    rotationSpeed: 0.035,
+    scaleBoost: 0.12,
+
+    color: "#9fbaff",
+  },
+
   processionalRows: {
     leftX: -6.35,
     rightX: 6.35,
