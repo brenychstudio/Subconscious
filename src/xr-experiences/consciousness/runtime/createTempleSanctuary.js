@@ -1508,6 +1508,246 @@ export function createTempleSanctuary() {
   passagePromptLight.position.set(0, -0.18, 0.26);
   passagePromptRoot.add(passagePromptLight);
 
+  // SCENE01-THRESHOLD-10F - Soft Passage State / Pre-Scene02 Handoff.
+  // This is a pre-handoff visual/state layer only.
+  // It does NOT teleport, does NOT switch rooms, and does NOT touch sky/global runtime.
+  const preScene02Root = new THREE.Group();
+  preScene02Root.name = "TempleSanctuaryPreScene02Handoff";
+  preScene02Root.visible = false;
+  preScene02Root.position.set(0, 0, -0.72);
+  transitionPortalRoot.add(preScene02Root);
+
+  const preScene02Rings = [];
+  const preScene02RingSpecs = [
+    { radius: 0.32, z: -0.28, tube: 0.004, opacity: 0.22, speed: -0.12 },
+    { radius: 0.54, z: -0.72, tube: 0.0038, opacity: 0.16, speed: 0.09 },
+    { radius: 0.78, z: -1.24, tube: 0.0034, opacity: 0.11, speed: -0.062 },
+    { radius: 1.08, z: -1.86, tube: 0.003, opacity: 0.075, speed: 0.044 },
+    { radius: 1.36, z: -2.62, tube: 0.0026, opacity: 0.052, speed: -0.028 },
+  ];
+
+  preScene02RingSpecs.forEach((spec, index) => {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(spec.radius, spec.tube, 8, 144),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(index < 2 ? "#f2f8ff" : "#9fbfff"),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    );
+
+    ring.name = `TempleSanctuaryPreScene02DepthRing_${index}`;
+    ring.position.z = spec.z;
+    ring.renderOrder = 96 + index;
+    preScene02Root.add(ring);
+
+    preScene02Rings.push({ ring, ...spec });
+  });
+
+  const preScene02StreamCount = 320;
+  const preScene02StreamPositions = new Float32Array(preScene02StreamCount * 3);
+  const preScene02StreamBasePositions = new Float32Array(preScene02StreamCount * 3);
+  const preScene02StreamPhases = new Float32Array(preScene02StreamCount);
+  const preScene02StreamSeeds = new Float32Array(preScene02StreamCount);
+
+  for (let i = 0; i < preScene02StreamCount; i += 1) {
+    const i3 = i * 3;
+    const lane = Math.random();
+    const angle = Math.random() * Math.PI * 2;
+
+    const z = THREE.MathUtils.lerp(0.18, -3.2, lane);
+    const radius =
+      THREE.MathUtils.lerp(1.16, 0.08, lane) * (0.38 + Math.random() * 0.86);
+
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius * 0.68;
+
+    preScene02StreamBasePositions[i3 + 0] = x;
+    preScene02StreamBasePositions[i3 + 1] = y;
+    preScene02StreamBasePositions[i3 + 2] = z;
+
+    preScene02StreamPositions[i3 + 0] = x;
+    preScene02StreamPositions[i3 + 1] = y;
+    preScene02StreamPositions[i3 + 2] = z;
+
+    preScene02StreamPhases[i] = Math.random() * Math.PI * 2;
+    preScene02StreamSeeds[i] = lane;
+  }
+
+  const preScene02StreamGeometry = new THREE.BufferGeometry();
+  preScene02StreamGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(preScene02StreamPositions, 3)
+  );
+
+  const preScene02StreamMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.001 : 0,
+    color: new THREE.Color("#f0f7ff"),
+    size: 0.064,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    toneMapped: false,
+  });
+
+  const preScene02Streams = new THREE.Points(
+    preScene02StreamGeometry,
+    preScene02StreamMaterial
+  );
+  preScene02Streams.name = "TempleSanctuaryPreScene02Streams";
+  preScene02Streams.visible = false;
+  preScene02Streams.renderOrder = 104;
+  preScene02Root.add(preScene02Streams);
+
+  const preScene02GuideLight = new THREE.PointLight(
+    new THREE.Color("#edf6ff"),
+    0,
+    7.2,
+    1.42
+  );
+  preScene02GuideLight.name = "TempleSanctuaryPreScene02GuideLight";
+  preScene02GuideLight.position.set(0, 0, -1.18);
+  preScene02Root.add(preScene02GuideLight);
+
+  // SCENE02-BOOTSTRAP-01 - Path Into the Unknown Shell.
+  // First visual shell for Scene 02. No teleport, no room switch, no sky/global changes.
+  const scene02ShellRoot = new THREE.Group();
+  scene02ShellRoot.name = "PathIntoUnknownScene02Shell";
+  scene02ShellRoot.visible = false;
+  scene02ShellRoot.position.set(0, 0, -1.18);
+  transitionPortalRoot.add(scene02ShellRoot);
+
+  const scene02VoidCoreMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#01040a"),
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    side: THREE.DoubleSide,
+    blending: THREE.NormalBlending,
+    toneMapped: false,
+  });
+
+  const scene02VoidCore = new THREE.Mesh(
+    new THREE.CircleGeometry(0.82, 128),
+    scene02VoidCoreMaterial
+  );
+  scene02VoidCore.name = "PathIntoUnknownVoidCore";
+  scene02VoidCore.position.z = -0.62;
+  scene02VoidCore.renderOrder = 118;
+  scene02ShellRoot.add(scene02VoidCore);
+
+  const scene02DepthRings = [];
+  const scene02DepthRingSpecs = [
+    { radius: 0.48, z: -0.42, tube: 0.0038, opacity: 0.22, speed: 0.13 },
+    { radius: 0.76, z: -0.98, tube: 0.0034, opacity: 0.17, speed: -0.1 },
+    { radius: 1.08, z: -1.68, tube: 0.003, opacity: 0.12, speed: 0.072 },
+    { radius: 1.42, z: -2.48, tube: 0.0027, opacity: 0.082, speed: -0.052 },
+    { radius: 1.82, z: -3.42, tube: 0.0024, opacity: 0.052, speed: 0.034 },
+    { radius: 2.28, z: -4.48, tube: 0.002, opacity: 0.032, speed: -0.024 },
+  ];
+
+  scene02DepthRingSpecs.forEach((spec, index) => {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(spec.radius, spec.tube, 8, 144),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(index < 2 ? "#f2f8ff" : "#7fa7ff"),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    );
+
+    ring.name = `PathIntoUnknownDepthRing_${index}`;
+    ring.position.z = spec.z;
+    ring.renderOrder = 120 + index;
+    scene02ShellRoot.add(ring);
+
+    scene02DepthRings.push({ ring, ...spec });
+  });
+
+  const scene02StreamCount = 420;
+  const scene02StreamPositions = new Float32Array(scene02StreamCount * 3);
+  const scene02StreamBasePositions = new Float32Array(scene02StreamCount * 3);
+  const scene02StreamPhases = new Float32Array(scene02StreamCount);
+  const scene02StreamSeeds = new Float32Array(scene02StreamCount);
+
+  for (let i = 0; i < scene02StreamCount; i += 1) {
+    const i3 = i * 3;
+    const lane = Math.random();
+    const angle = Math.random() * Math.PI * 2;
+
+    const z = THREE.MathUtils.lerp(0.24, -5.4, lane);
+    const radius =
+      THREE.MathUtils.lerp(1.48, 0.06, lane) * (0.34 + Math.random() * 0.92);
+
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius * 0.7;
+
+    scene02StreamBasePositions[i3 + 0] = x;
+    scene02StreamBasePositions[i3 + 1] = y;
+    scene02StreamBasePositions[i3 + 2] = z;
+
+    scene02StreamPositions[i3 + 0] = x;
+    scene02StreamPositions[i3 + 1] = y;
+    scene02StreamPositions[i3 + 2] = z;
+
+    scene02StreamPhases[i] = Math.random() * Math.PI * 2;
+    scene02StreamSeeds[i] = lane;
+  }
+
+  const scene02StreamGeometry = new THREE.BufferGeometry();
+  scene02StreamGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(scene02StreamPositions, 3)
+  );
+
+  const scene02StreamMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.001 : 0,
+    color: new THREE.Color("#eef6ff"),
+    size: 0.068,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    toneMapped: false,
+  });
+
+  const scene02Streams = new THREE.Points(
+    scene02StreamGeometry,
+    scene02StreamMaterial
+  );
+  scene02Streams.name = "PathIntoUnknownForwardStreams";
+  scene02Streams.visible = false;
+  scene02Streams.renderOrder = 130;
+  scene02ShellRoot.add(scene02Streams);
+
+  const scene02GuideLight = new THREE.PointLight(
+    new THREE.Color("#edf6ff"),
+    0,
+    9.2,
+    1.35
+  );
+  scene02GuideLight.name = "PathIntoUnknownGuideLight";
+  scene02GuideLight.position.set(0, 0, -2.2);
+  scene02ShellRoot.add(scene02GuideLight);
+
   // SCENE01-PORTAL-09D.2 - small luminous ticks make ring rotation readable.
   // Full circles rotate invisibly, so these restrained markers reveal mechanism motion.
   const transitionPortalMechanismMarkers = new THREE.Group();
@@ -1634,6 +1874,12 @@ export function createTempleSanctuary() {
   let firstPassageLevel = 0;
   let passagePromptLevel = 0;
   let enterReadinessLevel = 0;
+  let preScene02HoldTime = 0;
+  let preScene02HandoffTriggered = false;
+  let preScene02HandoffLevel = 0;
+  let scene02ShellHoldTime = 0;
+  let scene02ShellActivated = false;
+  let scene02ShellLevel = 0;
 
   const chamberWorldPosition = new THREE.Vector3();
   const cameraWorldPosition = new THREE.Vector3();
@@ -1649,6 +1895,14 @@ export function createTempleSanctuary() {
     enterReady: false,
     enterReadiness: 0,
     promptVisible: false,
+    preScene02HandoffTriggered: false,
+    preScene02HandoffLevel: 0,
+    preScene02Hold: 0,
+    handoffReady: false,
+    scene02ShellActivated: false,
+    scene02ShellLevel: 0,
+    scene02ShellHold: 0,
+    scene02ShellReady: false,
     hold: 0,
     readiness: 0,
     proximity: 0,
@@ -2735,8 +2989,146 @@ export function createTempleSanctuary() {
           enterReadinessLevel * THREE.MathUtils.lerp(0.08, 0.24, promptBreath);
       }
 
-      // Public readiness state for future Scene 02 trigger.
-      // This still does not trigger navigation yet.
+      // SCENE02-BOOTSTRAP-01 - Path Into the Unknown shell activation.
+      // This is still visual/state preparation only. No teleport or room switch.
+      const canActivateScene02Shell =
+        preScene02HandoffTriggered &&
+        preScene02HandoffLevel > 0.78 &&
+        transitionZoneLevel > 0.82;
+
+      if (canActivateScene02Shell && !scene02ShellActivated) {
+        scene02ShellHoldTime += deltaSeconds;
+
+        if (scene02ShellHoldTime > 1.15) {
+          scene02ShellActivated = true;
+        }
+      } else if (!scene02ShellActivated) {
+        scene02ShellHoldTime = Math.max(0, scene02ShellHoldTime - deltaSeconds * 0.8);
+      }
+
+      const scene02ShellTarget = scene02ShellActivated ? 1 : 0;
+
+      scene02ShellLevel = THREE.MathUtils.lerp(
+        scene02ShellLevel,
+        scene02ShellTarget,
+        0.032
+      );
+
+      const scene02Breath = 0.5 + 0.5 * Math.sin(t * 0.28);
+      const scene02Pulse = THREE.MathUtils.lerp(0.76, 1.24, scene02Breath);
+
+      scene02ShellRoot.visible = scene02ShellLevel > 0.01;
+
+      if (scene02ShellRoot.visible) {
+        scene02ShellRoot.scale.setScalar(
+          THREE.MathUtils.lerp(0.86, 1.28, scene02ShellLevel)
+        );
+
+        scene02ShellRoot.rotation.z -= deltaSeconds * 0.016 * scene02ShellLevel;
+
+        scene02VoidCoreMaterial.opacity =
+          scene02ShellLevel * THREE.MathUtils.lerp(0.32, 0.62, scene02Breath);
+
+        scene02VoidCore.scale.setScalar(
+          THREE.MathUtils.lerp(0.82, 1.18, scene02ShellLevel) *
+            THREE.MathUtils.lerp(0.96, 1.06, scene02Breath)
+        );
+
+        scene02DepthRings.forEach((entry, index) => {
+          entry.ring.visible = true;
+          entry.ring.rotation.z += deltaSeconds * entry.speed * scene02ShellLevel;
+
+          const ringBreath =
+            1 + Math.sin(t * 0.24 + index * 1.15) * 0.032 * scene02ShellLevel;
+
+          entry.ring.scale.setScalar(ringBreath);
+
+          entry.ring.material.opacity =
+            scene02ShellLevel *
+            entry.opacity *
+            scene02Pulse *
+            (index === 0 ? 1.34 : 1);
+        });
+
+        scene02Streams.visible = scene02ShellLevel > 0.02;
+        scene02StreamMaterial.opacity =
+          scene02ShellLevel * THREE.MathUtils.lerp(0.42, 1.18, scene02Breath);
+
+        if (scene02Streams.visible) {
+          const scene02Attr = scene02StreamGeometry.getAttribute("position");
+
+          for (let i = 0; i < scene02StreamCount; i += 1) {
+            const i3 = i * 3;
+            const phase = scene02StreamPhases[i];
+            const lane = scene02StreamSeeds[i];
+
+            const baseX = scene02StreamBasePositions[i3 + 0];
+            const baseY = scene02StreamBasePositions[i3 + 1];
+            const baseZ = scene02StreamBasePositions[i3 + 2];
+
+            const travel = (t * 0.26 + phase * 0.021 + lane) % 1;
+            const compression = THREE.MathUtils.lerp(
+              1.0,
+              0.04,
+              travel * scene02ShellLevel
+            );
+
+            const depthPull = travel * 4.4 * scene02ShellLevel;
+            const spiral = t * 0.62 + phase;
+
+            const swirlX = Math.sin(spiral) * 0.068 * scene02ShellLevel;
+            const swirlY = Math.cos(spiral * 0.78) * 0.052 * scene02ShellLevel;
+
+            scene02StreamPositions[i3 + 0] = baseX * compression + swirlX;
+            scene02StreamPositions[i3 + 1] = baseY * compression + swirlY;
+            scene02StreamPositions[i3 + 2] = baseZ - depthPull;
+          }
+
+          scene02Attr.needsUpdate = true;
+
+          scene02Streams.rotation.z -= deltaSeconds * 0.11 * scene02ShellLevel;
+          scene02Streams.rotation.y += deltaSeconds * 0.038 * scene02ShellLevel;
+        }
+
+        scene02GuideLight.intensity =
+          scene02ShellLevel * THREE.MathUtils.lerp(0.72, 2.35, scene02Breath);
+
+        scene02GuideLight.distance =
+          THREE.MathUtils.lerp(5.2, 10.4, scene02ShellLevel);
+
+        // Scene 02 shell makes previous prompt less important.
+        passagePromptSprite.material.opacity *= THREE.MathUtils.lerp(
+          1,
+          0.22,
+          scene02ShellLevel
+        );
+
+        passagePromptNeedles.children.forEach((needle) => {
+          needle.material.opacity *= THREE.MathUtils.lerp(
+            1,
+            0.32,
+            scene02ShellLevel
+          );
+        });
+
+        // Reinforce all existing passage layers into one deeper forward motion.
+        preScene02StreamMaterial.opacity += scene02ShellLevel * 0.18;
+        firstPassageStreakMaterial.opacity += scene02ShellLevel * 0.16;
+        thresholdPullMaterial.opacity += scene02ShellLevel * 0.14;
+        passageParticleMaterial.opacity += scene02ShellLevel * 0.12;
+
+        transitionPortalLight.intensity +=
+          scene02ShellLevel * THREE.MathUtils.lerp(0.18, 0.52, scene02Breath);
+
+        firstPassageLight.intensity +=
+          scene02ShellLevel * THREE.MathUtils.lerp(0.14, 0.36, scene02Breath);
+
+        preScene02GuideLight.intensity +=
+          scene02ShellLevel * THREE.MathUtils.lerp(0.18, 0.48, scene02Breath);
+      }
+
+      // Public readiness state for future real Scene 02 transition.
+      // This still does not perform navigation yet.
       root.userData.scene01Transition = {
         ready: transitionReadinessLevel > 0.72,
         inZone: transitionZoneLevel > 0.68,
@@ -2746,15 +3138,27 @@ export function createTempleSanctuary() {
         enterReady: enterReadinessLevel > 0.72,
         enterReadiness: enterReadinessLevel,
         promptVisible: passagePromptLevel > 0.2,
+        preScene02HandoffTriggered,
+        preScene02HandoffLevel,
+        preScene02Hold: preScene02HoldTime,
+        handoffReady: preScene02HandoffLevel > 0.82,
+        scene02ShellActivated,
+        scene02ShellLevel,
+        scene02ShellHold: scene02ShellHoldTime,
+        scene02ShellReady: scene02ShellLevel > 0.82,
         hold: firstPassageHoldTime,
         readiness: transitionReadinessLevel,
         proximity: transitionZoneLevel,
         phase:
-          enterReadinessLevel > 0.72
-            ? "enter-ready"
-            : firstPassageTriggered
-              ? "first-passage"
-              : "threshold-ready",
+          scene02ShellLevel > 0.82
+            ? "path-into-unknown-shell"
+            : preScene02HandoffLevel > 0.82
+              ? "pre-scene02-handoff"
+            : enterReadinessLevel > 0.72
+              ? "enter-ready"
+              : firstPassageTriggered
+                ? "first-passage"
+                : "threshold-ready",
       };
 
       transitionPortalParticles.visible = portalAmount > 0.025;
@@ -2828,6 +3232,14 @@ export function createTempleSanctuary() {
         enterReady: false,
         enterReadiness: 0,
         promptVisible: false,
+        preScene02HandoffTriggered: false,
+        preScene02HandoffLevel: 0,
+        preScene02Hold: 0,
+        handoffReady: false,
+        scene02ShellActivated: false,
+        scene02ShellLevel: 0,
+        scene02ShellHold: 0,
+        scene02ShellReady: false,
         hold: 0,
         readiness: 0,
         proximity: 0,
