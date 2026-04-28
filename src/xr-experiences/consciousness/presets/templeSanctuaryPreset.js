@@ -20,6 +20,78 @@ export const templeSanctuaryPreset = {
     auraRadius: 2.15,
   },
 
+  atmosphere: {
+    enabled: true,
+
+    anchorY: 1.45,
+
+    foregroundDust: {
+      count: 80,
+      radius: 2.2,
+      depth: 2.4,
+      yMin: -0.15,
+      yMax: 1.85,
+      size: 0.022,
+      opacity: 0.18,
+      drift: 0.22,
+      spin: 0.0009,
+      verticalAmplitude: 0.018,
+      lateralAmplitude: 0.012,
+    },
+
+    midDust: {
+      count: 120,
+      radius: 4.8,
+      depth: 5.4,
+      yMin: -0.25,
+      yMax: 2.8,
+      size: 0.03,
+      opacity: 0.12,
+      drift: 0.15,
+      spin: 0.00045,
+      verticalAmplitude: 0.026,
+      lateralAmplitude: 0.018,
+    },
+
+    backgroundDust: {
+      count: 180,
+      radius: 9.5,
+      depth: 10.5,
+      yMin: -0.4,
+      yMax: 4.4,
+      size: 0.04,
+      opacity: 0.08,
+      drift: 0.08,
+      spin: 0.00018,
+      verticalAmplitude: 0.035,
+      lateralAmplitude: 0.02,
+    },
+
+    haze: {
+      color: 0xdbe8ff,
+
+      nearRadius: 1.65,
+      nearHeight: 1.9,
+      nearOpacity: 0.045,
+
+      midRadius: 2.4,
+      midHeight: 2.4,
+      midOpacity: 0.03,
+
+      farRadius: 4.8,
+      farHeight: 3.6,
+      farOpacity: 0.018,
+    },
+
+    breath: {
+      speed: 0.95,
+      glowRadius: 2.25,
+      glowOpacityMin: 0.028,
+      glowOpacityMax: 0.085,
+      glowScaleAmp: 0.055,
+    },
+  },
+
   presence: {
     enabled: true,
     startDistance: 14.5,
@@ -148,16 +220,16 @@ export const templeSanctuaryPreset = {
     beamWidth: 0.18,
     beamDepthWidth: 1.2,
 
-    coreOpacity: 0.12,
+    coreOpacity: 0.0,
     sideOpacity: 0.0,
-    veilOpacity: 0.035,
+    veilOpacity: 0.0,
 
     floorWaveRadius: 2.75,
-    floorWaveOpacity: 0.06,
+    floorWaveOpacity: 0.0,
 
     pulseSpeed: 1.1,
     rotationSpeed: 0.0,
-    scaleBoost: 0.05,
+    scaleBoost: 0.0,
 
     color: "#c8dcff",
   },
@@ -184,21 +256,52 @@ export const templeSanctuaryPreset = {
   chamberDissolve: {
     enabled: true,
 
-    startAtOpen: 0.82,
-    rampSpeed: 0.065,
+    startAtOpen: 0.36,
+    rampSpeed: 0.052,
 
-    particleCount: 340,
-    particleSize: 0.03,
-    particleOpacity: 0.88,
+    particleCount: 620,
+    particleSize: 0.026,
+    particleOpacity: 0.86,
     particleColor: "#f2f6ff",
 
-    outwardDistance: 1.9,
-    upwardLift: 0.48,
-    wobble: 0.045,
+    outwardDistance: 3.35,
+    upwardLift: 0.82,
+    wobble: 0.09,
 
-    shellFadeTo: 0.14,
-    coreFadeTo: 0.04,
-    rootScaleTo: 0.92,
+    shellFadeTo: 0.0,
+    coreFadeTo: 0.0,
+    rootScaleTo: 0.38,
+    hideAt: 0.94,
+  },
+
+  transitionPortal: {
+    enabled: true,
+
+    z: -2.02,
+    y: 1.08,
+
+    radius: 1.22,
+    innerRadius: 0.62,
+    tube: 0.014,
+
+    startAtRelease: 0.18,
+    rampSpeed: 0.055,
+
+    coreOpacity: 0.36,
+    ringOpacity: 0.34,
+    innerRingOpacity: 0.22,
+
+    particleCount: 240,
+    particleSize: 0.022,
+    particleOpacity: 0.42,
+    particleDepth: 3.2,
+
+    pulseSpeed: 1.35,
+    rotationSpeed: 0.16,
+    pullSpeed: 0.42,
+
+    color: "#bcd6ff",
+    coreColor: "#040914",
   },
 
   processionalRows: {

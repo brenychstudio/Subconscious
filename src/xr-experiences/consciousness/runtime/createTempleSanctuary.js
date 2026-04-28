@@ -49,6 +49,39 @@ function makeAxialGlowMaterial({ color = "#b8d2ff", opacity = 0.1 } = {}) {
   });
 }
 
+function createSoftPointTexture(size = 96) {
+  if (typeof document === "undefined") return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+
+  const ctx = canvas.getContext("2d");
+  const half = size * 0.5;
+  const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+
+  gradient.addColorStop(0.0, "rgba(255,255,255,0.95)");
+  gradient.addColorStop(0.24, "rgba(235,244,255,0.72)");
+  gradient.addColorStop(0.56, "rgba(160,190,255,0.16)");
+  gradient.addColorStop(1.0, "rgba(255,255,255,0)");
+
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(half, half, half, 0, Math.PI * 2);
+  ctx.fill();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+
+  return texture;
+}
+
 function createRing(radius, opacity) {
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(Math.max(0.001, radius - 0.06), radius, 96),
@@ -219,6 +252,102 @@ function createRearGate(preset) {
   return root;
 }
 
+function sanctuaryRand(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function createSanctuaryDustLayer(THREE, spec, color = 0xffffff) {
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(spec.count * 3);
+  const basePositions = new Float32Array(spec.count * 3);
+  const phases = new Float32Array(spec.count);
+
+  for (let i = 0; i < spec.count; i += 1) {
+    const i3 = i * 3;
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.sqrt(Math.random()) * spec.radius;
+    const depth = sanctuaryRand(-spec.depth * 0.5, spec.depth * 0.5);
+    const y = sanctuaryRand(spec.yMin, spec.yMax);
+
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius + depth;
+
+    positions[i3 + 0] = x;
+    positions[i3 + 1] = y;
+    positions[i3 + 2] = z;
+
+    basePositions[i3 + 0] = x;
+    basePositions[i3 + 1] = y;
+    basePositions[i3 + 2] = z;
+
+    phases[i] = Math.random() * Math.PI * 2;
+  }
+
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.userData.basePositions = basePositions;
+  geometry.userData.phases = phases;
+
+  const material = new THREE.PointsMaterial({
+    color,
+    size: spec.size,
+    transparent: true,
+    opacity: spec.opacity,
+    depthWrite: false,
+    sizeAttenuation: true,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const points = new THREE.Points(geometry, material);
+  points.userData.spec = spec;
+  return points;
+}
+
+function updateSanctuaryDustLayer(points, elapsed, breathMix) {
+  if (!points) return;
+
+  const spec = points.userData.spec;
+  const positions = points.geometry.attributes.position.array;
+  const basePositions = points.geometry.userData.basePositions;
+  const phases = points.geometry.userData.phases;
+
+  for (let i = 0; i < phases.length; i += 1) {
+    const i3 = i * 3;
+    const phase = phases[i];
+
+    positions[i3 + 0] =
+      basePositions[i3 + 0] +
+      Math.cos(elapsed * spec.drift + phase) * spec.lateralAmplitude;
+
+    positions[i3 + 1] =
+      basePositions[i3 + 1] +
+      Math.sin(elapsed * spec.drift * 1.2 + phase) * spec.verticalAmplitude;
+
+    positions[i3 + 2] =
+      basePositions[i3 + 2] +
+      Math.sin(elapsed * spec.drift * 0.85 + phase * 1.37) * spec.lateralAmplitude;
+  }
+
+  points.geometry.attributes.position.needsUpdate = true;
+  points.rotation.y += spec.spin;
+  points.material.opacity = spec.opacity * (0.82 + breathMix * 0.32);
+}
+
+function createSanctuaryHazeShell(THREE, radius, height, color, opacity) {
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 28, 18),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+  );
+
+  shell.scale.set(1, height / radius, 1);
+  return shell;
+}
+
 export function createTempleSanctuary() {
   const preset = templeSanctuaryPreset;
 
@@ -228,6 +357,8 @@ export function createTempleSanctuary() {
   const decorRoot = new THREE.Group();
   decorRoot.name = "TempleSanctuaryDecorRoot";
   root.add(decorRoot);
+
+  const softPointTexture = createSoftPointTexture(96);
 
   const altarRoot = new THREE.Group();
   altarRoot.name = "TempleSanctuaryAltarRoot";
@@ -401,6 +532,9 @@ export function createTempleSanctuary() {
       depth: thresholdDrift.depth ?? 0.72,
     }),
     new THREE.PointsMaterial({
+      map: softPointTexture,
+      alphaMap: softPointTexture,
+      alphaTest: softPointTexture ? 0.002 : 0,
       color: new THREE.Color(thresholdDrift.color ?? "#a9c4ff"),
       transparent: true,
       opacity: 0,
@@ -408,6 +542,7 @@ export function createTempleSanctuary() {
       sizeAttenuation: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      toneMapped: false,
     })
   );
   thresholdDriftPoints.name = "TempleSanctuaryThresholdDrift";
@@ -503,9 +638,83 @@ export function createTempleSanctuary() {
   axialFloorWave.position.set(0, 0.026, 0);
   decorRoot.add(axialFloorWave);
 
-  const chamberRoot = altarRoot;
+  const chamberRoot = chamberAnchor;
   const spaceResponse = preset.spaceResponse ?? {};
   const chamberDissolve = preset.chamberDissolve ?? {};
+  const atmospherePreset = preset.atmosphere;
+  let atmosphere = null;
+
+  if (atmospherePreset?.enabled) {
+    const atmosphereRoot = new THREE.Group();
+    atmosphereRoot.name = "sanctuaryAtmosphere";
+    atmosphereRoot.position.set(0, atmospherePreset.anchorY ?? 1.45, 0);
+
+    const foregroundDust = createSanctuaryDustLayer(
+      THREE,
+      atmospherePreset.foregroundDust
+    );
+    const midDust = createSanctuaryDustLayer(
+      THREE,
+      atmospherePreset.midDust
+    );
+    const backgroundDust = createSanctuaryDustLayer(
+      THREE,
+      atmospherePreset.backgroundDust
+    );
+
+    const nearHaze = createSanctuaryHazeShell(
+      THREE,
+      atmospherePreset.haze.nearRadius,
+      atmospherePreset.haze.nearHeight,
+      atmospherePreset.haze.color,
+      atmospherePreset.haze.nearOpacity
+    );
+
+    const midHaze = createSanctuaryHazeShell(
+      THREE,
+      atmospherePreset.haze.midRadius,
+      atmospherePreset.haze.midHeight,
+      atmospherePreset.haze.color,
+      atmospherePreset.haze.midOpacity
+    );
+
+    const farHaze = createSanctuaryHazeShell(
+      THREE,
+      atmospherePreset.haze.farRadius,
+      atmospherePreset.haze.farHeight,
+      atmospherePreset.haze.color,
+      atmospherePreset.haze.farOpacity
+    );
+
+    const breathingGlow = createSanctuaryHazeShell(
+      THREE,
+      atmospherePreset.breath.glowRadius,
+      atmospherePreset.breath.glowRadius * 0.72,
+      atmospherePreset.haze.color,
+      atmospherePreset.breath.glowOpacityMin
+    );
+
+    atmosphereRoot.add(farHaze);
+    atmosphereRoot.add(backgroundDust);
+    atmosphereRoot.add(midHaze);
+    atmosphereRoot.add(midDust);
+    atmosphereRoot.add(nearHaze);
+    atmosphereRoot.add(foregroundDust);
+    atmosphereRoot.add(breathingGlow);
+
+    root.add(atmosphereRoot);
+
+    atmosphere = {
+      root: atmosphereRoot,
+      foregroundDust,
+      midDust,
+      backgroundDust,
+      nearHaze,
+      midHaze,
+      farHaze,
+      breathingGlow,
+    };
+  }
 
   // ---------------------------------------------
   // SPACE RESPONSE AMBIENT PARTICLES
@@ -551,6 +760,9 @@ export function createTempleSanctuary() {
   );
 
   const ambientMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.002 : 0,
     color: new THREE.Color(spaceResponse.ambientParticleColor ?? "#d7e7ff"),
     size: spaceResponse.ambientParticleSize ?? 0.028,
     transparent: true,
@@ -558,6 +770,7 @@ export function createTempleSanctuary() {
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     sizeAttenuation: true,
+    toneMapped: false,
   });
 
   const ambientPoints = new THREE.Points(ambientGeometry, ambientMaterial);
@@ -569,29 +782,38 @@ export function createTempleSanctuary() {
   // CHAMBER DISSOLVE PREP
   // ---------------------------------------------
   const chamberVisualEntries = [];
+  const chamberVisualEntryKeys = new Set();
 
-  chamberRoot.traverse((child) => {
-    if (!child) return;
+  const collectChamberVisualEntries = () => {
+    chamberRoot.traverse((child) => {
+      if (!child) return;
+      if (!(child.isMesh || child.isLine || child.isPoints) || !child.material) {
+        return;
+      }
 
-    if ((child.isMesh || child.isLine || child.isPoints) && child.material) {
-      if (Array.isArray(child.material)) {
-        child.material.forEach((mat) => {
-          if (!mat) return;
-          chamberVisualEntries.push({
-            child,
-            material: mat,
-            baseOpacity: mat.opacity ?? 1,
-          });
-        });
-      } else {
+      const registerMaterial = (material) => {
+        if (!material) return;
+
+        const key = `${child.uuid}:${material.uuid}`;
+        if (chamberVisualEntryKeys.has(key)) return;
+
+        chamberVisualEntryKeys.add(key);
+        material.transparent = true;
+
         chamberVisualEntries.push({
           child,
-          material: child.material,
-          baseOpacity: child.material.opacity ?? 1,
+          material,
+          baseOpacity: material.opacity ?? 1,
         });
+      };
+
+      if (Array.isArray(child.material)) {
+        child.material.forEach(registerMaterial);
+      } else {
+        registerMaterial(child.material);
       }
-    }
-  });
+    });
+  };
 
   const dissolveParticleCount = chamberDissolve.particleCount ?? 340;
   const dissolvePositions = new Float32Array(dissolveParticleCount * 3);
@@ -642,6 +864,9 @@ export function createTempleSanctuary() {
   );
 
   const dissolveMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.002 : 0,
     color: new THREE.Color(chamberDissolve.particleColor ?? "#f2f6ff"),
     size: chamberDissolve.particleSize ?? 0.03,
     transparent: true,
@@ -649,6 +874,7 @@ export function createTempleSanctuary() {
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     sizeAttenuation: true,
+    toneMapped: false,
   });
 
   const chamberDissolvePoints = new THREE.Points(dissolveGeometry, dissolveMaterial);
@@ -657,8 +883,124 @@ export function createTempleSanctuary() {
   chamberDissolvePoints.visible = false;
   decorRoot.add(chamberDissolvePoints);
 
-  const chamberRootBaseScale = chamberRoot.scale.clone();
+  const transitionPortal = preset.transitionPortal ?? {};
+
+  const transitionPortalRoot = new THREE.Group();
+  transitionPortalRoot.name = "TempleSanctuaryTransitionPortal";
+  transitionPortalRoot.position.set(
+    0,
+    preset.altar.height + (transitionPortal.y ?? 1.08),
+    transitionPortal.z ?? -2.02
+  );
+  transitionPortalRoot.visible = false;
+  decorRoot.add(transitionPortalRoot);
+
+  const transitionPortalCore = new THREE.Mesh(
+    new THREE.CircleGeometry(transitionPortal.innerRadius ?? 0.62, 96),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color(transitionPortal.coreColor ?? "#040914"),
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.NormalBlending,
+      toneMapped: false,
+    })
+  );
+  transitionPortalCore.name = "TempleSanctuaryTransitionPortalCore";
+  transitionPortalCore.position.z = -0.04;
+  transitionPortalRoot.add(transitionPortalCore);
+
+  const transitionPortalRing = new THREE.Mesh(
+    new THREE.TorusGeometry(
+      transitionPortal.radius ?? 1.22,
+      transitionPortal.tube ?? 0.014,
+      12,
+      160
+    ),
+    makeAxialGlowMaterial({
+      color: transitionPortal.color ?? "#bcd6ff",
+      opacity: 0,
+    })
+  );
+  transitionPortalRing.name = "TempleSanctuaryTransitionPortalRing";
+  transitionPortalRoot.add(transitionPortalRing);
+
+  const transitionPortalInnerRing = new THREE.Mesh(
+    new THREE.TorusGeometry(
+      transitionPortal.innerRadius ?? 0.62,
+      (transitionPortal.tube ?? 0.014) * 0.62,
+      10,
+      144
+    ),
+    makeAxialGlowMaterial({
+      color: transitionPortal.color ?? "#bcd6ff",
+      opacity: 0,
+    })
+  );
+  transitionPortalInnerRing.name = "TempleSanctuaryTransitionPortalInnerRing";
+  transitionPortalInnerRing.position.z = -0.02;
+  transitionPortalRoot.add(transitionPortalInnerRing);
+
+  const portalParticleCount = transitionPortal.particleCount ?? 240;
+  const portalParticlePositions = new Float32Array(portalParticleCount * 3);
+  const portalParticleBasePositions = new Float32Array(portalParticleCount * 3);
+  const portalParticlePhase = new Float32Array(portalParticleCount);
+
+  for (let i = 0; i < portalParticleCount; i += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = THREE.MathUtils.lerp(
+      transitionPortal.innerRadius ?? 0.62,
+      transitionPortal.radius ?? 1.22,
+      Math.random()
+    );
+    const depth = -Math.random() * (transitionPortal.particleDepth ?? 3.2);
+
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    const z = depth;
+
+    portalParticleBasePositions[i * 3 + 0] = x;
+    portalParticleBasePositions[i * 3 + 1] = y;
+    portalParticleBasePositions[i * 3 + 2] = z;
+
+    portalParticlePositions[i * 3 + 0] = x;
+    portalParticlePositions[i * 3 + 1] = y;
+    portalParticlePositions[i * 3 + 2] = z;
+
+    portalParticlePhase[i] = Math.random() * Math.PI * 2;
+  }
+
+  const transitionPortalParticleGeometry = new THREE.BufferGeometry();
+  transitionPortalParticleGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(portalParticlePositions, 3)
+  );
+
+  const transitionPortalParticleMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.002 : 0,
+    color: new THREE.Color(transitionPortal.color ?? "#bcd6ff"),
+    size: transitionPortal.particleSize ?? 0.022,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    toneMapped: false,
+  });
+
+  const transitionPortalParticles = new THREE.Points(
+    transitionPortalParticleGeometry,
+    transitionPortalParticleMaterial
+  );
+  transitionPortalParticles.name = "TempleSanctuaryTransitionPortalParticles";
+  transitionPortalParticles.visible = false;
+  transitionPortalRoot.add(transitionPortalParticles);
+
   let chamberReleaseAmount = 0;
+  let transitionPortalOpenAmount = 0;
 
   let t = 0;
   let proximityLevel = 0;
@@ -804,7 +1146,15 @@ export function createTempleSanctuary() {
         chargeInfluence * (ritualCharge.scaleBoost ?? 0.045) +
         transformationCueLevel * (transformationCue.scaleBoost ?? 0.075);
 
-      chamberAnchor.scale.setScalar(proximityScale * breath);
+      const dissolveScaleMultiplier = THREE.MathUtils.lerp(
+        1,
+        chamberDissolve.rootScaleTo ?? 0.38,
+        chamberReleaseAmount
+      );
+
+      chamberAnchor.scale.setScalar(
+        proximityScale * breath * dissolveScaleMultiplier
+      );
 
       const spin =
         preset.chamber.spinSpeed +
@@ -951,6 +1301,42 @@ export function createTempleSanctuary() {
           Math.max(0, Math.sin(t * 0.65)) * 0.025
       );
 
+      if (atmosphere && atmospherePreset?.enabled) {
+        const breathMix =
+          0.5 + 0.5 * Math.sin(t * atmospherePreset.breath.speed);
+
+        updateSanctuaryDustLayer(atmosphere.foregroundDust, t, breathMix);
+        updateSanctuaryDustLayer(atmosphere.midDust, t * 0.9, breathMix);
+        updateSanctuaryDustLayer(atmosphere.backgroundDust, t * 0.75, breathMix);
+
+        atmosphere.nearHaze.material.opacity =
+          atmospherePreset.haze.nearOpacity * (0.88 + breathMix * 0.35);
+
+        atmosphere.midHaze.material.opacity =
+          atmospherePreset.haze.midOpacity * (0.9 + breathMix * 0.28);
+
+        atmosphere.farHaze.material.opacity =
+          atmospherePreset.haze.farOpacity * (0.95 + breathMix * 0.18);
+
+        const glowOpacity =
+          atmospherePreset.breath.glowOpacityMin +
+          (atmospherePreset.breath.glowOpacityMax -
+            atmospherePreset.breath.glowOpacityMin) *
+            breathMix;
+
+        atmosphere.breathingGlow.material.opacity = glowOpacity;
+
+        const glowScale = 1 + breathMix * atmospherePreset.breath.glowScaleAmp;
+        atmosphere.breathingGlow.scale.set(
+          glowScale,
+          (atmospherePreset.breath.glowRadius * 0.72 /
+            atmospherePreset.breath.glowRadius) * glowScale,
+          glowScale
+        );
+
+        atmosphere.root.rotation.y += 0.00035;
+      }
+
       // ---------------------------------------------
       // SPACE RESPONSE PARTICLES
       // ---------------------------------------------
@@ -992,6 +1378,8 @@ export function createTempleSanctuary() {
       // ---------------------------------------------
       // CHAMBER DISSOLVE
       // ---------------------------------------------
+      collectChamberVisualEntries();
+
       const dissolveEnabled = chamberDissolve.enabled !== false;
       const dissolveTrigger = chamberDissolve.startAtOpen ?? 0.82;
       const dissolveTarget =
@@ -1005,9 +1393,7 @@ export function createTempleSanctuary() {
 
       const dissolveAmount = chamberReleaseAmount;
 
-      chamberRoot.scale.copy(chamberRootBaseScale).multiplyScalar(
-        THREE.MathUtils.lerp(1, chamberDissolve.rootScaleTo ?? 0.92, dissolveAmount)
-      );
+      chamberRoot.visible = dissolveAmount < (chamberDissolve.hideAt ?? 0.94);
 
       for (const entry of chamberVisualEntries) {
         const mat = entry.material;
@@ -1023,11 +1409,14 @@ export function createTempleSanctuary() {
           ? chamberDissolve.coreFadeTo ?? 0.04
           : chamberDissolve.shellFadeTo ?? 0.14;
 
-        mat.opacity = THREE.MathUtils.lerp(
-          entry.baseOpacity,
-          entry.baseOpacity * targetFade,
-          dissolveAmount
-        );
+        mat.opacity =
+          dissolveAmount >= (chamberDissolve.hideAt ?? 0.94)
+            ? 0
+            : THREE.MathUtils.lerp(
+                entry.baseOpacity,
+                entry.baseOpacity * targetFade,
+                dissolveAmount
+              );
       }
 
       chamberDissolvePoints.visible = dissolveAmount > 0.01;
@@ -1070,6 +1459,83 @@ export function createTempleSanctuary() {
         }
 
         attr.needsUpdate = true;
+      }
+
+      // ---------------------------------------------
+      // TRANSITION PORTAL OPENING / PULL
+      // ---------------------------------------------
+      const portalEnabled = transitionPortal.enabled !== false;
+      const portalTarget =
+        portalEnabled &&
+        chamberReleaseAmount >= (transitionPortal.startAtRelease ?? 0.18)
+          ? 1
+          : 0;
+
+      transitionPortalOpenAmount = THREE.MathUtils.lerp(
+        transitionPortalOpenAmount,
+        portalTarget,
+        transitionPortal.rampSpeed ?? 0.055
+      );
+
+      const portalAmount = transitionPortalOpenAmount;
+      const portalPulse =
+        0.72 +
+        Math.max(0, Math.sin(t * (transitionPortal.pulseSpeed ?? 1.35))) * 0.28;
+
+      transitionPortalRoot.visible = portalAmount > 0.015;
+
+      if (transitionPortalRoot.visible) {
+        transitionPortalRoot.rotation.z +=
+          deltaSeconds *
+          (transitionPortal.rotationSpeed ?? 0.16) *
+          (0.35 + portalAmount);
+
+        transitionPortalRoot.scale.setScalar(0.72 + portalAmount * 0.38);
+      }
+
+      transitionPortalCore.material.opacity =
+        portalAmount * (transitionPortal.coreOpacity ?? 0.36) * portalPulse;
+
+      transitionPortalRing.material.opacity =
+        portalAmount * (transitionPortal.ringOpacity ?? 0.34) * portalPulse;
+
+      transitionPortalInnerRing.material.opacity =
+        portalAmount * (transitionPortal.innerRingOpacity ?? 0.22) * portalPulse;
+
+      transitionPortalParticles.visible = portalAmount > 0.025;
+      transitionPortalParticleMaterial.opacity =
+        portalAmount * (transitionPortal.particleOpacity ?? 0.42) * portalPulse;
+
+      if (transitionPortalParticles.visible) {
+        transitionPortalParticles.rotation.z -=
+          deltaSeconds *
+          (transitionPortal.pullSpeed ?? 0.42) *
+          (0.2 + portalAmount);
+
+        const portalAttr = transitionPortalParticleGeometry.getAttribute("position");
+
+        for (let i = 0; i < portalParticleCount; i += 1) {
+          const ix = i * 3 + 0;
+          const iy = i * 3 + 1;
+          const iz = i * 3 + 2;
+          const phase = portalParticlePhase[i];
+          const inward = portalAmount * 0.22;
+
+          portalParticlePositions[ix] =
+            portalParticleBasePositions[ix] * (1 - inward) +
+            Math.sin(t * 0.9 + phase) * 0.035 * portalAmount;
+
+          portalParticlePositions[iy] =
+            portalParticleBasePositions[iy] * (1 - inward) +
+            Math.cos(t * 0.75 + phase) * 0.028 * portalAmount;
+
+          portalParticlePositions[iz] =
+            portalParticleBasePositions[iz] -
+            portalAmount * 0.46 +
+            Math.sin(t * 0.55 + phase) * 0.06 * portalAmount;
+        }
+
+        portalAttr.needsUpdate = true;
       }
 
       return Math.max(
@@ -1115,6 +1581,7 @@ export function createTempleSanctuary() {
       openingStateLevel = 0;
     },
     dispose() {
+      softPointTexture?.dispose?.();
       root.traverse((obj) => {
         if (obj.geometry) obj.geometry.dispose?.();
         if (obj.material) disposeMaterial(obj.material);
