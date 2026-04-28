@@ -1144,6 +1144,154 @@ export function createTempleSanctuary() {
   passageParticles.renderOrder = 84;
   passageRoot.add(passageParticles);
 
+  // SCENE01-THRESHOLD-10B - Pull Field / Spatial Invitation.
+  // A restrained directional field in front of the portal. It suggests passage,
+  // without teleporting or changing room state.
+  const thresholdPullFieldCount = 260;
+  const thresholdPullPositions = new Float32Array(thresholdPullFieldCount * 3);
+  const thresholdPullBasePositions = new Float32Array(thresholdPullFieldCount * 3);
+  const thresholdPullPhases = new Float32Array(thresholdPullFieldCount);
+  const thresholdPullSeeds = new Float32Array(thresholdPullFieldCount);
+
+  for (let i = 0; i < thresholdPullFieldCount; i += 1) {
+    const i3 = i * 3;
+    const lane = Math.random();
+    const angle = Math.random() * Math.PI * 2;
+
+    // Wider near the viewer, narrower toward the aperture.
+    const z = THREE.MathUtils.lerp(0.52, -1.95, lane);
+    const radius = THREE.MathUtils.lerp(1.38, 0.28, lane) * (0.45 + Math.random() * 0.7);
+
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius * 0.62;
+
+    thresholdPullBasePositions[i3 + 0] = x;
+    thresholdPullBasePositions[i3 + 1] = y;
+    thresholdPullBasePositions[i3 + 2] = z;
+
+    thresholdPullPositions[i3 + 0] = x;
+    thresholdPullPositions[i3 + 1] = y;
+    thresholdPullPositions[i3 + 2] = z;
+
+    thresholdPullPhases[i] = Math.random() * Math.PI * 2;
+    thresholdPullSeeds[i] = lane;
+  }
+
+  const thresholdPullGeometry = new THREE.BufferGeometry();
+  thresholdPullGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(thresholdPullPositions, 3)
+  );
+
+  const thresholdPullMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.001 : 0,
+    color: new THREE.Color("#dceaff"),
+    size: 0.06,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    toneMapped: false,
+  });
+
+  const thresholdPullField = new THREE.Points(
+    thresholdPullGeometry,
+    thresholdPullMaterial
+  );
+  thresholdPullField.name = "TempleSanctuaryThresholdPullField";
+  thresholdPullField.visible = false;
+  thresholdPullField.renderOrder = 86;
+  transitionPortalRoot.add(thresholdPullField);
+
+  // SCENE01-THRESHOLD-10C - Transition Trigger Readiness.
+  // Visual/readiness zone only. No teleport, no room switch, no sky changes.
+  const transitionReadinessRoot = new THREE.Group();
+  transitionReadinessRoot.name = "TempleSanctuaryTransitionReadinessZone";
+  transitionReadinessRoot.visible = false;
+  decorRoot.add(transitionReadinessRoot);
+
+  const transitionTriggerZ = (transitionPortal.z ?? -2.02) + 0.78;
+
+  const transitionReadinessRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.74, 0.79, 128),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#bcd6ff"),
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    })
+  );
+  transitionReadinessRing.name = "TempleSanctuaryTransitionReadinessRing";
+  transitionReadinessRing.rotation.x = -Math.PI / 2;
+  transitionReadinessRing.position.set(0, 0.045, transitionTriggerZ);
+  transitionReadinessRing.scale.set(0.78, 1.32, 1);
+  transitionReadinessRoot.add(transitionReadinessRing);
+
+  const transitionReadinessInnerRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.36, 0.39, 96),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#edf6ff"),
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    })
+  );
+  transitionReadinessInnerRing.name = "TempleSanctuaryTransitionReadinessInnerRing";
+  transitionReadinessInnerRing.rotation.x = -Math.PI / 2;
+  transitionReadinessInnerRing.position.set(0, 0.052, transitionTriggerZ);
+  transitionReadinessInnerRing.scale.set(0.84, 1.18, 1);
+  transitionReadinessRoot.add(transitionReadinessInnerRing);
+
+  const transitionReadinessNeedles = new THREE.Group();
+  transitionReadinessNeedles.name = "TempleSanctuaryTransitionReadinessNeedles";
+  transitionReadinessNeedles.position.set(0, 0.062, transitionTriggerZ);
+  transitionReadinessRoot.add(transitionReadinessNeedles);
+
+  function createTransitionReadinessNeedle(angle, length = 0.22, width = 0.011) {
+    const needle = new THREE.Mesh(
+      new THREE.BoxGeometry(length, width, 0.01),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color("#e8f2ff"),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    );
+
+    const radius = 0.79;
+    needle.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
+    needle.rotation.z = angle + Math.PI * 0.5;
+
+    return needle;
+  }
+
+  transitionReadinessNeedles.add(
+    createTransitionReadinessNeedle(0),
+    createTransitionReadinessNeedle(Math.PI * 0.5, 0.16, 0.009),
+    createTransitionReadinessNeedle(Math.PI, 0.22, 0.011),
+    createTransitionReadinessNeedle(Math.PI * 1.5, 0.16, 0.009)
+  );
+
+  const transitionReadinessGlow = new THREE.PointLight(
+    new THREE.Color("#9fbfff"),
+    0,
+    2.8,
+    1.9
+  );
+  transitionReadinessGlow.name = "TempleSanctuaryTransitionReadinessGlow";
+  transitionReadinessGlow.position.set(0, 0.36, transitionTriggerZ);
+  transitionReadinessRoot.add(transitionReadinessGlow);
+
   // SCENE01-PORTAL-09D.2 - small luminous ticks make ring rotation readable.
   // Full circles rotate invisibly, so these restrained markers reveal mechanism motion.
   const transitionPortalMechanismMarkers = new THREE.Group();
@@ -1263,10 +1411,21 @@ export function createTempleSanctuary() {
   let transformationCueTriggered = false;
   let transformationCueLevel = 0;
   let openingStateLevel = 0;
+  let transitionReadinessLevel = 0;
+  let transitionZoneLevel = 0;
 
   const chamberWorldPosition = new THREE.Vector3();
   const cameraWorldPosition = new THREE.Vector3();
+  const transitionZoneWorldPosition = new THREE.Vector3();
   const baseChamberScale = preset.chamber.scale ?? 1;
+
+  root.userData.scene01Transition = {
+    ready: false,
+    inZone: false,
+    canTransition: false,
+    readiness: 0,
+    proximity: 0,
+  };
 
   return {
     root,
@@ -2036,6 +2195,156 @@ export function createTempleSanctuary() {
         }
       }
 
+      // SCENE01-THRESHOLD-10B - directional pull field.
+      // The portal starts behaving like a passage, not only a rotating object.
+      const pullAmount = THREE.MathUtils.smoothstep(portalAmount, 0.18, 0.96);
+      const pullBreath = 0.5 + 0.5 * Math.sin(t * 0.46);
+      const pullStrength = pullAmount * THREE.MathUtils.lerp(0.42, 1.0, pullBreath);
+
+      thresholdPullField.visible = pullAmount > 0.025;
+      thresholdPullMaterial.opacity =
+        pullAmount * THREE.MathUtils.lerp(0.26, 0.78, pullBreath);
+
+      if (thresholdPullField.visible) {
+        const pullAttr = thresholdPullGeometry.getAttribute("position");
+
+        for (let i = 0; i < thresholdPullFieldCount; i += 1) {
+          const i3 = i * 3;
+          const phase = thresholdPullPhases[i];
+          const lane = thresholdPullSeeds[i];
+
+          const baseX = thresholdPullBasePositions[i3 + 0];
+          const baseY = thresholdPullBasePositions[i3 + 1];
+          const baseZ = thresholdPullBasePositions[i3 + 2];
+
+          // A slow loop makes particles feel continuously drawn inward.
+          const travel = (t * 0.105 + phase * 0.035 + lane) % 1;
+          const narrowing = THREE.MathUtils.lerp(1.0, 0.22, travel * pullStrength);
+          const depthShift = travel * 1.75 * pullStrength;
+
+          const spiral = t * 0.38 + phase;
+          const spiralX = Math.sin(spiral) * 0.045 * pullAmount * (1 - lane * 0.35);
+          const spiralY = Math.cos(spiral * 0.82) * 0.035 * pullAmount * (1 - lane * 0.25);
+
+          thresholdPullPositions[i3 + 0] = baseX * narrowing + spiralX;
+          thresholdPullPositions[i3 + 1] = baseY * narrowing + spiralY;
+          thresholdPullPositions[i3 + 2] = baseZ - depthShift;
+        }
+
+        pullAttr.needsUpdate = true;
+
+        // Very slow field rotation. This should feel gravitational, not like a spinner.
+        thresholdPullField.rotation.z -= deltaSeconds * 0.038 * pullAmount;
+        thresholdPullField.rotation.y += deltaSeconds * 0.012 * pullAmount;
+      }
+
+      // Local light response: aperture grows slightly more persuasive after opening.
+      // This is additive to the 10A passage light, still local to the portal.
+      transitionPortalLight.intensity +=
+        pullAmount * THREE.MathUtils.lerp(0.08, 0.26, pullBreath);
+
+      // SCENE01-THRESHOLD-10C - transition readiness zone.
+      // This prepares the future passage trigger without switching rooms yet.
+      const transitionReadyTarget = portalAmount > 0.78 ? 1 : 0;
+
+      transitionReadinessLevel = THREE.MathUtils.lerp(
+        transitionReadinessLevel,
+        transitionReadyTarget,
+        0.045
+      );
+
+      let transitionZoneTarget = 0;
+
+      if (
+        transitionReadinessLevel > 0.05 &&
+        camera &&
+        typeof camera.getWorldPosition === "function"
+      ) {
+        transitionReadinessRing.getWorldPosition(transitionZoneWorldPosition);
+        camera.getWorldPosition(cameraWorldPosition);
+
+        const dx = cameraWorldPosition.x - transitionZoneWorldPosition.x;
+        const dz = cameraWorldPosition.z - transitionZoneWorldPosition.z;
+        const horizontalDistance = Math.sqrt(dx * dx + dz * dz);
+
+        const zoneStartDistance = 2.35;
+        const zoneFullDistance = 0.72;
+        const zoneRange = Math.max(0.001, zoneStartDistance - zoneFullDistance);
+
+        transitionZoneTarget =
+          1 -
+          THREE.MathUtils.clamp(
+            (horizontalDistance - zoneFullDistance) / zoneRange,
+            0,
+            1
+          );
+      }
+
+      transitionZoneLevel = THREE.MathUtils.lerp(
+        transitionZoneLevel,
+        transitionZoneTarget,
+        0.075
+      );
+
+      const transitionZoneBreath = 0.5 + 0.5 * Math.sin(t * 0.62);
+      const transitionZonePresence = Math.max(
+        transitionReadinessLevel * 0.62,
+        transitionZoneLevel
+      );
+
+      transitionReadinessRoot.visible = transitionReadinessLevel > 0.035;
+
+      if (transitionReadinessRoot.visible) {
+        transitionReadinessRing.material.opacity =
+          transitionReadinessLevel *
+          THREE.MathUtils.lerp(0.08, 0.22, transitionZoneBreath) +
+          transitionZoneLevel * 0.18;
+
+        transitionReadinessInnerRing.material.opacity =
+          transitionReadinessLevel *
+          THREE.MathUtils.lerp(0.04, 0.14, 1 - transitionZoneBreath) +
+          transitionZoneLevel * 0.22;
+
+        transitionReadinessRing.rotation.z +=
+          deltaSeconds * 0.018 * transitionReadinessLevel;
+
+        transitionReadinessInnerRing.rotation.z -=
+          deltaSeconds * 0.026 * transitionReadinessLevel;
+
+        transitionReadinessNeedles.rotation.z +=
+          deltaSeconds * THREE.MathUtils.lerp(0.018, 0.075, transitionZoneLevel);
+
+        transitionReadinessNeedles.children.forEach((needle, index) => {
+          needle.material.opacity =
+            transitionReadinessLevel *
+            THREE.MathUtils.lerp(0.08, 0.34, transitionZoneBreath) *
+            (index % 2 === 0 ? 1 : 0.62) +
+            transitionZoneLevel * 0.22;
+        });
+
+        transitionReadinessGlow.intensity =
+          transitionZonePresence *
+          THREE.MathUtils.lerp(0.04, 0.22, transitionZoneBreath);
+
+        transitionReadinessGlow.distance =
+          THREE.MathUtils.lerp(1.8, 3.4, transitionZonePresence);
+
+        // The pull field becomes slightly more persuasive when the viewer approaches the zone.
+        thresholdPullMaterial.opacity += transitionZoneLevel * 0.14;
+        transitionPortalLight.intensity += transitionZoneLevel * 0.18;
+      }
+
+      // Public readiness state for future Scene 02 trigger.
+      // This does not trigger navigation yet.
+      root.userData.scene01Transition = {
+        ready: transitionReadinessLevel > 0.72,
+        inZone: transitionZoneLevel > 0.68,
+        canTransition:
+          transitionReadinessLevel > 0.72 && transitionZoneLevel > 0.68,
+        readiness: transitionReadinessLevel,
+        proximity: transitionZoneLevel,
+      };
+
       transitionPortalParticles.visible = portalAmount > 0.025;
       transitionPortalParticleMaterial.opacity =
         portalAmount *
@@ -2096,6 +2405,15 @@ export function createTempleSanctuary() {
     },
     getRitualChargeLevel() {
       return ritualChargeLevel;
+    },
+    getTransitionReadiness() {
+      return root.userData.scene01Transition ?? {
+        ready: false,
+        inZone: false,
+        canTransition: false,
+        readiness: 0,
+        proximity: 0,
+      };
     },
     isRitualChargeComplete() {
       return ritualChargeComplete;
