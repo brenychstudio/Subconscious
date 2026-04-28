@@ -503,6 +503,163 @@ export function createTempleSanctuary() {
   axialFloorWave.position.set(0, 0.026, 0);
   decorRoot.add(axialFloorWave);
 
+  const chamberRoot = altarRoot;
+  const spaceResponse = preset.spaceResponse ?? {};
+  const chamberDissolve = preset.chamberDissolve ?? {};
+
+  // ---------------------------------------------
+  // SPACE RESPONSE AMBIENT PARTICLES
+  // ---------------------------------------------
+  const ambientParticleCount = spaceResponse.ambientParticleCount ?? 180;
+  const ambientPositions = new Float32Array(ambientParticleCount * 3);
+  const ambientBasePositions = new Float32Array(ambientParticleCount * 3);
+  const ambientPhase = new Float32Array(ambientParticleCount);
+  const ambientLift = new Float32Array(ambientParticleCount);
+
+  for (let i = 0; i < ambientParticleCount; i += 1) {
+    const r = THREE.MathUtils.lerp(
+      spaceResponse.ambientParticleRadiusMin ?? 1.4,
+      spaceResponse.ambientParticleRadiusMax ?? 5.6,
+      Math.random()
+    );
+    const a = Math.random() * Math.PI * 2;
+    const y = THREE.MathUtils.lerp(
+      spaceResponse.ambientParticleYMin ?? 0.3,
+      spaceResponse.ambientParticleYMax ?? 3.2,
+      Math.random()
+    );
+
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+
+    ambientBasePositions[i * 3 + 0] = x;
+    ambientBasePositions[i * 3 + 1] = y;
+    ambientBasePositions[i * 3 + 2] = z;
+
+    ambientPositions[i * 3 + 0] = x;
+    ambientPositions[i * 3 + 1] = y;
+    ambientPositions[i * 3 + 2] = z;
+
+    ambientPhase[i] = Math.random() * Math.PI * 2;
+    ambientLift[i] = 0.3 + Math.random() * 0.7;
+  }
+
+  const ambientGeometry = new THREE.BufferGeometry();
+  ambientGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(ambientPositions, 3)
+  );
+
+  const ambientMaterial = new THREE.PointsMaterial({
+    color: new THREE.Color(spaceResponse.ambientParticleColor ?? "#d7e7ff"),
+    size: spaceResponse.ambientParticleSize ?? 0.028,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+  });
+
+  const ambientPoints = new THREE.Points(ambientGeometry, ambientMaterial);
+  ambientPoints.name = "TempleSanctuaryAmbientResponsePoints";
+  ambientPoints.visible = false;
+  decorRoot.add(ambientPoints);
+
+  // ---------------------------------------------
+  // CHAMBER DISSOLVE PREP
+  // ---------------------------------------------
+  const chamberVisualEntries = [];
+
+  chamberRoot.traverse((child) => {
+    if (!child) return;
+
+    if ((child.isMesh || child.isLine || child.isPoints) && child.material) {
+      if (Array.isArray(child.material)) {
+        child.material.forEach((mat) => {
+          if (!mat) return;
+          chamberVisualEntries.push({
+            child,
+            material: mat,
+            baseOpacity: mat.opacity ?? 1,
+          });
+        });
+      } else {
+        chamberVisualEntries.push({
+          child,
+          material: child.material,
+          baseOpacity: child.material.opacity ?? 1,
+        });
+      }
+    }
+  });
+
+  const dissolveParticleCount = chamberDissolve.particleCount ?? 340;
+  const dissolvePositions = new Float32Array(dissolveParticleCount * 3);
+  const dissolveBasePositions = new Float32Array(dissolveParticleCount * 3);
+  const dissolveDirections = new Float32Array(dissolveParticleCount * 3);
+  const dissolveSpeeds = new Float32Array(dissolveParticleCount);
+  const dissolveLift = new Float32Array(dissolveParticleCount);
+  const dissolvePhase = new Float32Array(dissolveParticleCount);
+
+  for (let i = 0; i < dissolveParticleCount; i += 1) {
+    const theta = Math.random() * Math.PI * 2;
+    const v = Math.random() * 2 - 1;
+    const phi = Math.acos(v);
+
+    const radius = 0.18 + Math.random() * 0.52;
+
+    const x = Math.sin(phi) * Math.cos(theta) * radius;
+    const y = Math.cos(phi) * radius;
+    const z = Math.sin(phi) * Math.sin(theta) * radius;
+
+    dissolveBasePositions[i * 3 + 0] = x;
+    dissolveBasePositions[i * 3 + 1] = y;
+    dissolveBasePositions[i * 3 + 2] = z;
+
+    dissolvePositions[i * 3 + 0] = x;
+    dissolvePositions[i * 3 + 1] = y;
+    dissolvePositions[i * 3 + 2] = z;
+
+    const dir = new THREE.Vector3(
+      x + (Math.random() - 0.5) * 0.25,
+      y + (Math.random() - 0.5) * 0.15,
+      z + (Math.random() - 0.5) * 0.25
+    ).normalize();
+
+    dissolveDirections[i * 3 + 0] = dir.x;
+    dissolveDirections[i * 3 + 1] = dir.y;
+    dissolveDirections[i * 3 + 2] = dir.z;
+
+    dissolveSpeeds[i] = 0.6 + Math.random() * 0.8;
+    dissolveLift[i] = 0.4 + Math.random() * 0.7;
+    dissolvePhase[i] = Math.random() * Math.PI * 2;
+  }
+
+  const dissolveGeometry = new THREE.BufferGeometry();
+  dissolveGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(dissolvePositions, 3)
+  );
+
+  const dissolveMaterial = new THREE.PointsMaterial({
+    color: new THREE.Color(chamberDissolve.particleColor ?? "#f2f6ff"),
+    size: chamberDissolve.particleSize ?? 0.03,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+  });
+
+  const chamberDissolvePoints = new THREE.Points(dissolveGeometry, dissolveMaterial);
+  chamberDissolvePoints.name = "TempleSanctuaryChamberDissolvePoints";
+  chamberDissolvePoints.position.copy(chamberRoot.position);
+  chamberDissolvePoints.visible = false;
+  decorRoot.add(chamberDissolvePoints);
+
+  const chamberRootBaseScale = chamberRoot.scale.clone();
+  let chamberReleaseAmount = 0;
+
   let t = 0;
   let proximityLevel = 0;
   let handAttunementTarget = 0;
@@ -737,11 +894,11 @@ export function createTempleSanctuary() {
           Math.sin(t * (drift.liftSpeed ?? 0.045)) *
           (drift.breathing ?? 0.035);
 
-      thresholdDriftPoints.material.opacity =
-        Math.max(
-          driftAmount * (drift.opacity ?? 0.16),
-          openingStateLevel * (openingState.driftFloor ?? 0.075)
-        ) * cueWave;
+        thresholdDriftPoints.material.opacity =
+          Math.max(
+            driftAmount * (drift.opacity ?? 0.16),
+            openingStateLevel * (openingState.driftFloor ?? 0.075)
+          ) * cueWave;
       } else {
         thresholdDriftPoints.material.opacity = 0;
       }
@@ -750,44 +907,170 @@ export function createTempleSanctuary() {
       const axialEnabled = axial.enabled !== false;
       const axialAmount = axialEnabled ? openingStateLevel : 0;
       const axialPulse =
-        0.68 +
-        Math.max(0, Math.sin(t * (axial.pulseSpeed ?? 1.45))) * 0.32;
+        0.72 +
+        Math.max(0, Math.sin(t * (axial.pulseSpeed ?? 1.1))) * 0.28;
 
       axialRoot.visible = axialAmount > 0.018;
 
       if (axialRoot.visible) {
         axialRoot.rotation.z +=
-          deltaSeconds *
-          (axial.rotationSpeed ?? 0.024) *
-          (0.25 + axialAmount);
+          deltaSeconds * (axial.rotationSpeed ?? 0.0) * (0.25 + axialAmount);
 
         axialRoot.scale.setScalar(
-          1 + axialAmount * (axial.scaleBoost ?? 0.18)
+          1 + axialAmount * (axial.scaleBoost ?? 0.05)
         );
       }
 
       axialCoreBeam.material.opacity =
-        axialAmount * (axial.coreOpacity ?? 0.34) * axialPulse;
+        axialAmount * (axial.coreOpacity ?? 0.12) * axialPulse;
 
       axialDepthBeam.material.opacity =
-        axialAmount * (axial.veilOpacity ?? 0.11) * axialPulse;
+        axialAmount * (axial.veilOpacity ?? 0.035) * axialPulse;
 
       axialSideBeamLeft.material.opacity =
-        axialAmount * (axial.sideOpacity ?? 0.12) * axialPulse;
+        axialAmount * (axial.sideOpacity ?? 0.0) * axialPulse;
 
       axialSideBeamRight.material.opacity =
-        axialAmount * (axial.sideOpacity ?? 0.12) * axialPulse;
+        axialAmount * (axial.sideOpacity ?? 0.0) * axialPulse;
 
       axialVeil.material.opacity =
-        axialAmount * (axial.veilOpacity ?? 0.11) * axialPulse;
+        axialAmount * (axial.veilOpacity ?? 0.035) * axialPulse;
 
       axialFloorWave.visible = axialAmount > 0.018;
       axialFloorWave.material.opacity =
-        axialAmount * (axial.floorWaveOpacity ?? 0.18) * axialPulse;
+        axialAmount * (axial.floorWaveOpacity ?? 0.06) * axialPulse;
+
+      const responseBreath =
+        1 +
+        Math.sin(t * (spaceResponse.breathSpeed ?? 0.7)) *
+          (spaceResponse.breathAmplitude ?? 0.08);
 
       axialFloorWave.scale.setScalar(
-        0.88 + axialAmount * 0.18 + Math.max(0, Math.sin(t * 0.65)) * 0.035
+        0.92 +
+          axialAmount * (0.08 + (spaceResponse.floorBreathBoost ?? 0.08)) +
+          Math.max(0, Math.sin(t * 0.65)) * 0.025
       );
+
+      // ---------------------------------------------
+      // SPACE RESPONSE PARTICLES
+      // ---------------------------------------------
+      const ambientAmount = spaceResponse.enabled !== false ? openingStateLevel : 0;
+
+      ambientPoints.visible = ambientAmount > 0.02;
+      ambientMaterial.opacity =
+        ambientAmount *
+        (spaceResponse.ambientParticleOpacity ?? 0.18) *
+        (0.78 + Math.max(0, Math.sin(t * 0.9)) * 0.22);
+
+      if (ambientPoints.visible) {
+        const attr = ambientGeometry.getAttribute("position");
+
+        for (let i = 0; i < ambientParticleCount; i += 1) {
+          const ix = i * 3 + 0;
+          const iy = i * 3 + 1;
+          const iz = i * 3 + 2;
+
+          const phase = ambientPhase[i];
+          const lift = ambientLift[i];
+
+          ambientPositions[ix] =
+            ambientBasePositions[ix] +
+            Math.sin(t * 0.35 + phase) * 0.035 * ambientAmount;
+
+          ambientPositions[iy] =
+            ambientBasePositions[iy] +
+            Math.sin(t * 0.7 + phase) * 0.05 * lift * ambientAmount;
+
+          ambientPositions[iz] =
+            ambientBasePositions[iz] +
+            Math.cos(t * 0.35 + phase) * 0.035 * ambientAmount;
+        }
+
+        attr.needsUpdate = true;
+      }
+
+      // ---------------------------------------------
+      // CHAMBER DISSOLVE
+      // ---------------------------------------------
+      const dissolveEnabled = chamberDissolve.enabled !== false;
+      const dissolveTrigger = chamberDissolve.startAtOpen ?? 0.82;
+      const dissolveTarget =
+        dissolveEnabled && openingStateLevel >= dissolveTrigger ? 1 : 0;
+
+      chamberReleaseAmount = THREE.MathUtils.lerp(
+        chamberReleaseAmount,
+        dissolveTarget,
+        chamberDissolve.rampSpeed ?? 0.065
+      );
+
+      const dissolveAmount = chamberReleaseAmount;
+
+      chamberRoot.scale.copy(chamberRootBaseScale).multiplyScalar(
+        THREE.MathUtils.lerp(1, chamberDissolve.rootScaleTo ?? 0.92, dissolveAmount)
+      );
+
+      for (const entry of chamberVisualEntries) {
+        const mat = entry.material;
+        if (!mat) continue;
+
+        mat.transparent = true;
+
+        const lowerName = String(entry.child?.name ?? "").toLowerCase();
+        const isCoreLike =
+          lowerName.includes("core") || lowerName.includes("inner");
+
+        const targetFade = isCoreLike
+          ? chamberDissolve.coreFadeTo ?? 0.04
+          : chamberDissolve.shellFadeTo ?? 0.14;
+
+        mat.opacity = THREE.MathUtils.lerp(
+          entry.baseOpacity,
+          entry.baseOpacity * targetFade,
+          dissolveAmount
+        );
+      }
+
+      chamberDissolvePoints.visible = dissolveAmount > 0.01;
+      dissolveMaterial.opacity =
+        dissolveAmount * (chamberDissolve.particleOpacity ?? 0.88);
+      dissolveMaterial.size =
+        (chamberDissolve.particleSize ?? 0.03) *
+        (0.92 + responseBreath * 0.12);
+
+      if (chamberDissolvePoints.visible) {
+        const attr = dissolveGeometry.getAttribute("position");
+        const spread = dissolveAmount * (chamberDissolve.outwardDistance ?? 1.9);
+        const liftBase = dissolveAmount * (chamberDissolve.upwardLift ?? 0.48);
+        const wobble = (chamberDissolve.wobble ?? 0.045) * dissolveAmount;
+
+        for (let i = 0; i < dissolveParticleCount; i += 1) {
+          const ix = i * 3 + 0;
+          const iy = i * 3 + 1;
+          const iz = i * 3 + 2;
+
+          const speed = dissolveSpeeds[i];
+          const lift = dissolveLift[i];
+          const phase = dissolvePhase[i];
+
+          dissolvePositions[ix] =
+            dissolveBasePositions[ix] +
+            dissolveDirections[ix] * spread * speed +
+            Math.sin(t * 0.9 + phase) * wobble;
+
+          dissolvePositions[iy] =
+            dissolveBasePositions[iy] +
+            dissolveDirections[iy] * spread * speed +
+            liftBase * lift +
+            Math.sin(t * 1.15 + phase) * wobble * 0.6;
+
+          dissolvePositions[iz] =
+            dissolveBasePositions[iz] +
+            dissolveDirections[iz] * spread * speed +
+            Math.cos(t * 0.9 + phase) * wobble;
+        }
+
+        attr.needsUpdate = true;
+      }
 
       return Math.max(
         proximityLevel,

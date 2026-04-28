@@ -144,22 +144,61 @@ export const templeSanctuaryPreset = {
     z: -1.34,
     y: 1.22,
 
-    beamHeight: 5.8,
-    beamWidth: 0.34,
-    beamDepthWidth: 1.95,
+    beamHeight: 5.2,
+    beamWidth: 0.18,
+    beamDepthWidth: 1.2,
 
-    coreOpacity: 0.34,
-    sideOpacity: 0.12,
-    veilOpacity: 0.11,
+    coreOpacity: 0.12,
+    sideOpacity: 0.0,
+    veilOpacity: 0.035,
 
     floorWaveRadius: 2.75,
-    floorWaveOpacity: 0.18,
+    floorWaveOpacity: 0.06,
 
-    pulseSpeed: 1.45,
-    rotationSpeed: 0.024,
-    scaleBoost: 0.18,
+    pulseSpeed: 1.1,
+    rotationSpeed: 0.0,
+    scaleBoost: 0.05,
 
-    color: "#b8d2ff",
+    color: "#c8dcff",
+  },
+
+  spaceResponse: {
+    enabled: true,
+
+    breathSpeed: 0.7,
+    breathAmplitude: 0.08,
+
+    ambientParticleCount: 180,
+    ambientParticleSize: 0.028,
+    ambientParticleOpacity: 0.18,
+    ambientParticleRadiusMin: 1.4,
+    ambientParticleRadiusMax: 5.6,
+    ambientParticleYMin: 0.3,
+    ambientParticleYMax: 3.2,
+    ambientParticleColor: "#d7e7ff",
+
+    starPulseOpacity: 0.12,
+    floorBreathBoost: 0.08,
+  },
+
+  chamberDissolve: {
+    enabled: true,
+
+    startAtOpen: 0.82,
+    rampSpeed: 0.065,
+
+    particleCount: 340,
+    particleSize: 0.03,
+    particleOpacity: 0.88,
+    particleColor: "#f2f6ff",
+
+    outwardDistance: 1.9,
+    upwardLift: 0.48,
+    wobble: 0.045,
+
+    shellFadeTo: 0.14,
+    coreFadeTo: 0.04,
+    rootScaleTo: 0.92,
   },
 
   processionalRows: {
