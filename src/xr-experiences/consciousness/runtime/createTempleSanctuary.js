@@ -1292,6 +1292,112 @@ export function createTempleSanctuary() {
   transitionReadinessGlow.position.set(0, 0.36, transitionTriggerZ);
   transitionReadinessRoot.add(transitionReadinessGlow);
 
+  // SCENE01-THRESHOLD-10D — First Passage Trigger / Soft Scene State Shift.
+  // This is the first real "passage activated" state, but it does NOT teleport
+  // and does NOT switch rooms yet.
+  const firstPassageRoot = new THREE.Group();
+  firstPassageRoot.name = "TempleSanctuaryFirstPassageState";
+  firstPassageRoot.visible = false;
+  firstPassageRoot.position.set(0, 0, -0.34);
+  transitionPortalRoot.add(firstPassageRoot);
+
+  const firstPassageTunnelRings = [];
+  const firstPassageTunnelSpecs = [
+    { radius: 0.44, z: -0.38, tube: 0.0048, opacity: 0.2, speed: 0.09 },
+    { radius: 0.62, z: -0.78, tube: 0.0042, opacity: 0.16, speed: -0.074 },
+    { radius: 0.84, z: -1.22, tube: 0.0038, opacity: 0.12, speed: 0.052 },
+    { radius: 1.08, z: -1.74, tube: 0.0032, opacity: 0.08, speed: -0.036 },
+  ];
+
+  firstPassageTunnelSpecs.forEach((spec, index) => {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(spec.radius, spec.tube, 8, 132),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(index < 2 ? "#e9f3ff" : "#8fb4ff"),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    );
+
+    ring.name = `TempleSanctuaryFirstPassageTunnelRing_${index}`;
+    ring.position.z = spec.z;
+    ring.renderOrder = 88 + index;
+    firstPassageRoot.add(ring);
+    firstPassageTunnelRings.push({ ring, ...spec });
+  });
+
+  const firstPassageStreakCount = 220;
+  const firstPassageStreakPositions = new Float32Array(firstPassageStreakCount * 3);
+  const firstPassageStreakBasePositions = new Float32Array(firstPassageStreakCount * 3);
+  const firstPassageStreakPhases = new Float32Array(firstPassageStreakCount);
+  const firstPassageStreakSeeds = new Float32Array(firstPassageStreakCount);
+
+  for (let i = 0; i < firstPassageStreakCount; i += 1) {
+    const i3 = i * 3;
+    const lane = Math.random();
+    const angle = Math.random() * Math.PI * 2;
+
+    const z = THREE.MathUtils.lerp(0.12, -2.6, lane);
+    const radius = THREE.MathUtils.lerp(1.08, 0.16, lane) * (0.45 + Math.random() * 0.78);
+
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius * 0.68;
+
+    firstPassageStreakBasePositions[i3 + 0] = x;
+    firstPassageStreakBasePositions[i3 + 1] = y;
+    firstPassageStreakBasePositions[i3 + 2] = z;
+
+    firstPassageStreakPositions[i3 + 0] = x;
+    firstPassageStreakPositions[i3 + 1] = y;
+    firstPassageStreakPositions[i3 + 2] = z;
+
+    firstPassageStreakPhases[i] = Math.random() * Math.PI * 2;
+    firstPassageStreakSeeds[i] = lane;
+  }
+
+  const firstPassageStreakGeometry = new THREE.BufferGeometry();
+  firstPassageStreakGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(firstPassageStreakPositions, 3)
+  );
+
+  const firstPassageStreakMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.001 : 0,
+    color: new THREE.Color("#eaf3ff"),
+    size: 0.058,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    toneMapped: false,
+  });
+
+  const firstPassageStreaks = new THREE.Points(
+    firstPassageStreakGeometry,
+    firstPassageStreakMaterial
+  );
+  firstPassageStreaks.name = "TempleSanctuaryFirstPassageStreaks";
+  firstPassageStreaks.visible = false;
+  firstPassageStreaks.renderOrder = 92;
+  firstPassageRoot.add(firstPassageStreaks);
+
+  const firstPassageLight = new THREE.PointLight(
+    new THREE.Color("#dceaff"),
+    0,
+    5.8,
+    1.55
+  );
+  firstPassageLight.name = "TempleSanctuaryFirstPassageLight";
+  firstPassageLight.position.set(0, 0, -0.72);
+  firstPassageRoot.add(firstPassageLight);
+
   // SCENE01-PORTAL-09D.2 - small luminous ticks make ring rotation readable.
   // Full circles rotate invisibly, so these restrained markers reveal mechanism motion.
   const transitionPortalMechanismMarkers = new THREE.Group();
@@ -1413,6 +1519,9 @@ export function createTempleSanctuary() {
   let openingStateLevel = 0;
   let transitionReadinessLevel = 0;
   let transitionZoneLevel = 0;
+  let firstPassageHoldTime = 0;
+  let firstPassageTriggered = false;
+  let firstPassageLevel = 0;
 
   const chamberWorldPosition = new THREE.Vector3();
   const cameraWorldPosition = new THREE.Vector3();
@@ -1423,8 +1532,12 @@ export function createTempleSanctuary() {
     ready: false,
     inZone: false,
     canTransition: false,
+    firstPassageTriggered: false,
+    firstPassageLevel: 0,
+    hold: 0,
     readiness: 0,
     proximity: 0,
+    phase: "closed",
   };
 
   return {
@@ -2335,14 +2448,116 @@ export function createTempleSanctuary() {
       }
 
       // Public readiness state for future Scene 02 trigger.
-      // This does not trigger navigation yet.
+      // This still does not trigger navigation yet.
+      const canStartFirstPassage =
+        transitionReadinessLevel > 0.72 && transitionZoneLevel > 0.68;
+
+      if (canStartFirstPassage && !firstPassageTriggered) {
+        firstPassageHoldTime += deltaSeconds;
+
+        if (firstPassageHoldTime > 1.15) {
+          firstPassageTriggered = true;
+        }
+      } else if (!firstPassageTriggered) {
+        firstPassageHoldTime = Math.max(
+          0,
+          firstPassageHoldTime - deltaSeconds * 0.8
+        );
+      }
+
+      const firstPassageTarget = firstPassageTriggered ? 1 : 0;
+
+      firstPassageLevel = THREE.MathUtils.lerp(
+        firstPassageLevel,
+        firstPassageTarget,
+        0.035
+      );
+
+      const firstPassageBreath = 0.5 + 0.5 * Math.sin(t * 0.38);
+      const firstPassagePulse = THREE.MathUtils.lerp(0.78, 1.18, firstPassageBreath);
+
+      firstPassageRoot.visible = firstPassageLevel > 0.012;
+
+      if (firstPassageRoot.visible) {
+        firstPassageRoot.scale.setScalar(
+          THREE.MathUtils.lerp(0.92, 1.16, firstPassageLevel)
+        );
+
+        firstPassageTunnelRings.forEach((entry, index) => {
+          entry.ring.visible = true;
+          entry.ring.rotation.z += deltaSeconds * entry.speed * firstPassageLevel;
+
+          entry.ring.material.opacity =
+            firstPassageLevel *
+            entry.opacity *
+            firstPassagePulse *
+            (index === 0 ? 1.22 : 1);
+
+          const tunnelScale =
+            1 + Math.sin(t * 0.32 + index * 1.4) * 0.026 * firstPassageLevel;
+
+          entry.ring.scale.setScalar(tunnelScale);
+        });
+
+        firstPassageStreaks.visible = firstPassageLevel > 0.025;
+        firstPassageStreakMaterial.opacity =
+          firstPassageLevel * THREE.MathUtils.lerp(0.28, 0.86, firstPassageBreath);
+
+        if (firstPassageStreaks.visible) {
+          const streakAttr = firstPassageStreakGeometry.getAttribute("position");
+
+          for (let i = 0; i < firstPassageStreakCount; i += 1) {
+            const i3 = i * 3;
+            const phase = firstPassageStreakPhases[i];
+            const lane = firstPassageStreakSeeds[i];
+
+            const baseX = firstPassageStreakBasePositions[i3 + 0];
+            const baseY = firstPassageStreakBasePositions[i3 + 1];
+            const baseZ = firstPassageStreakBasePositions[i3 + 2];
+
+            const travel = (t * 0.16 + phase * 0.033 + lane) % 1;
+            const inward = THREE.MathUtils.lerp(1.0, 0.16, travel * firstPassageLevel);
+            const depthPull = travel * 2.25 * firstPassageLevel;
+
+            const spiral = t * 0.44 + phase;
+            const swirlX = Math.sin(spiral) * 0.05 * firstPassageLevel;
+            const swirlY = Math.cos(spiral * 0.82) * 0.04 * firstPassageLevel;
+
+            firstPassageStreakPositions[i3 + 0] = baseX * inward + swirlX;
+            firstPassageStreakPositions[i3 + 1] = baseY * inward + swirlY;
+            firstPassageStreakPositions[i3 + 2] = baseZ - depthPull;
+          }
+
+          streakAttr.needsUpdate = true;
+
+          firstPassageStreaks.rotation.z -= deltaSeconds * 0.072 * firstPassageLevel;
+          firstPassageStreaks.rotation.y += deltaSeconds * 0.026 * firstPassageLevel;
+        }
+
+        firstPassageLight.intensity =
+          firstPassageLevel * THREE.MathUtils.lerp(0.42, 1.25, firstPassageBreath);
+
+        firstPassageLight.distance =
+          THREE.MathUtils.lerp(3.8, 6.2, firstPassageLevel);
+
+        // Push existing portal response into a more decisive passage state.
+        transitionPortalLight.intensity +=
+          firstPassageLevel * THREE.MathUtils.lerp(0.16, 0.42, firstPassageBreath);
+
+        thresholdPullMaterial.opacity += firstPassageLevel * 0.2;
+        passageParticleMaterial.opacity += firstPassageLevel * 0.16;
+      }
+
       root.userData.scene01Transition = {
         ready: transitionReadinessLevel > 0.72,
         inZone: transitionZoneLevel > 0.68,
-        canTransition:
-          transitionReadinessLevel > 0.72 && transitionZoneLevel > 0.68,
+        canTransition: canStartFirstPassage,
+        firstPassageTriggered,
+        firstPassageLevel,
+        hold: firstPassageHoldTime,
         readiness: transitionReadinessLevel,
         proximity: transitionZoneLevel,
+        phase: firstPassageTriggered ? "first-passage" : "threshold-ready",
       };
 
       transitionPortalParticles.visible = portalAmount > 0.025;
@@ -2411,8 +2626,12 @@ export function createTempleSanctuary() {
         ready: false,
         inZone: false,
         canTransition: false,
+        firstPassageTriggered: false,
+        firstPassageLevel: 0,
+        hold: 0,
         readiness: 0,
         proximity: 0,
+        phase: "closed",
       };
     },
     isRitualChargeComplete() {
