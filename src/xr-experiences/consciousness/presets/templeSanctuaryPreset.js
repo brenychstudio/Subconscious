@@ -1,23 +1,39 @@
 export const templeSanctuaryPreset = {
   userSpawn: {
-    position: { x: 0, y: 1.6, z: 23.5 },
-    lookAt: { x: 0, y: 1.22, z: 0.12 },
+    position: { x: 0, y: 1.6, z: 24.5 },
+    lookAt: { x: 0, y: 1.18, z: 0.08 },
   },
 
   altar: {
-    radius: 2.85,
-    height: 0.16,
+    radius: 2.7,
+    height: 0.15,
   },
 
   chamber: {
     position: { x: 0, y: 0, z: 0 },
-    offsetY: 0.82,
-    scale: 1.0,
+    offsetY: 0.78,
+    scale: 1.04,
     spinSpeed: 0.072,
-    lightIntensity: 2.18,
-    lightDistance: 34,
+    lightIntensity: 2.32,
+    lightDistance: 36,
     auraOpacity: 0.0,
     auraRadius: 2.15,
+  },
+
+  presence: {
+    enabled: true,
+    startDistance: 14.5,
+    fullDistance: 3.1,
+    smoothing: 0.065,
+
+    spinBoost: 0.14,
+    lightBoost: 2.1,
+    scaleBoost: 0.085,
+
+    breathSpeed: 1.15,
+    breathAmplitude: 0.032,
+    proximityPulseBoost: 0.055,
+    lightPulseBoost: 0.34,
   },
 
   processionalRows: {
@@ -59,8 +75,8 @@ export const templeSanctuaryPreset = {
   },
 
   floorRings: {
-    radii: [2.35, 4.65, 7.25],
-    opacity: 0.095,
+    radii: [2.2, 4.45, 7.15],
+    opacity: 0.075,
   },
 
   callLight: {

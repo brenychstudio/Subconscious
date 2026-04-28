@@ -303,20 +303,82 @@ export function createTempleSanctuary() {
   decorRoot.add(rearGlow);
 
   let t = 0;
+  let proximityLevel = 0;
+  const chamberWorldPosition = new THREE.Vector3();
+  const cameraWorldPosition = new THREE.Vector3();
+  const baseChamberScale = preset.chamber.scale ?? 1;
 
   return {
     root,
     altarRoot,
     chamberAnchor,
-    update(deltaSeconds = 0) {
+    update(deltaSeconds = 0, camera = null) {
       t += deltaSeconds;
-      chamberAnchor.rotation.y += deltaSeconds * preset.chamber.spinSpeed;
-      callRing.material.opacity =
-        preset.callLight.ringOpacity + Math.sin(t * 0.72) * 0.015;
-      rearGlow.material.opacity =
-        preset.callLight.rearGlowOpacity + Math.sin(t * 0.55) * 0.01;
+
+      const presence = preset.presence ?? {};
+      let targetProximity = 0;
+
+      if (
+        presence.enabled !== false &&
+        camera &&
+        typeof camera.getWorldPosition === "function"
+      ) {
+        chamberAnchor.getWorldPosition(chamberWorldPosition);
+        camera.getWorldPosition(cameraWorldPosition);
+
+        const distance = cameraWorldPosition.distanceTo(chamberWorldPosition);
+        const startDistance = presence.startDistance ?? 10.5;
+        const fullDistance = presence.fullDistance ?? 2.8;
+        const range = Math.max(0.001, startDistance - fullDistance);
+
+        targetProximity =
+          1 -
+          THREE.MathUtils.clamp(
+            (distance - fullDistance) / range,
+            0,
+            1
+          );
+      }
+
+      proximityLevel = THREE.MathUtils.lerp(
+        proximityLevel,
+        targetProximity,
+        presence.smoothing ?? 0.055
+      );
+
+      const breathSpeed = presence.breathSpeed ?? 1.15;
+      const baseBreath = presence.breathAmplitude ?? 0.032;
+      const proximityPulseBoost = presence.proximityPulseBoost ?? 0.055;
+
+      const pulseWave = Math.sin(t * breathSpeed);
+      const breath =
+        1 +
+        pulseWave *
+          (baseBreath * 0.45 + proximityLevel * proximityPulseBoost);
+
+      const proximityScale =
+        baseChamberScale + proximityLevel * (presence.scaleBoost ?? 0.085);
+
+      chamberAnchor.scale.setScalar(proximityScale * breath);
+
+      const spin =
+        preset.chamber.spinSpeed +
+        proximityLevel * (presence.spinBoost ?? 0.14);
+
+      chamberAnchor.rotation.y += deltaSeconds * spin;
+
       chamberLight.intensity =
-        preset.chamber.lightIntensity + Math.sin(t * 0.8) * 0.06;
+        preset.chamber.lightIntensity +
+        Math.sin(t * 0.8) * 0.08 +
+        proximityLevel * (presence.lightBoost ?? 2.1) +
+        Math.max(0, pulseWave) *
+          proximityLevel *
+          (presence.lightPulseBoost ?? 0.34);
+
+      callRing.material.opacity = Math.max(0, preset.callLight.ringOpacity);
+      rearGlow.material.opacity = Math.max(0, preset.callLight.rearGlowOpacity);
+
+      return proximityLevel;
     },
     dispose() {
       root.traverse((obj) => {

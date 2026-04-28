@@ -120,6 +120,7 @@ export function createRitualSoundEngine() {
   let currentRoomId = "hall-of-arrival";
   let roomPresence = 0;
   let portalPresence = 0;
+  let sanctuaryPresence = 0;
 
   let voiceEnergy = 0;
   let voiceBrightness = 0;
@@ -236,6 +237,10 @@ export function createRitualSoundEngine() {
     portalPresence = clamp01(value);
   };
 
+  const setSanctuaryPresence = (value) => {
+    sanctuaryPresence = clamp01(value);
+  };
+
   const setVoiceFeatures = (features) => {
     voiceEnergy = clamp01(features?.energy ?? 0);
     voiceBrightness = clamp01(features?.brightness ?? 0);
@@ -258,10 +263,33 @@ export function createRitualSoundEngine() {
 
     const arrivalTarget = mix.arrival * presenceScalar * (0.052 + voiceMain * 0.024 + voiceAir * 0.01) * OUTPUT_GAIN;
     const signalTarget = mix.signal * presenceScalar * (0.065 + voiceBrightness * 0.026 + voiceImpulse * 0.022) * OUTPUT_GAIN;
-    const membraneTarget = mix.membrane * presenceScalar * (0.078 + voiceMain * 0.04 + voiceBreath * 0.016) * OUTPUT_GAIN;
-    const portalTarget = ((mix.portal * presenceScalar) + portalPresence * 0.85) * (0.078 + voiceBrightness * 0.026 + voiceAir * 0.02) * OUTPUT_GAIN;
-    const bedTarget = (0.038 + roomPresence * 0.018 + voiceMain * 0.012) * OUTPUT_GAIN;
-    const airTarget = (0.008 + portalPresence * 0.012 + roomPresence * 0.004 + voiceBrightness * 0.004 + voiceAir * 0.004) * OUTPUT_GAIN;
+    const membraneTarget =
+      (mix.membrane *
+        presenceScalar *
+        (0.078 + voiceMain * 0.04 + voiceBreath * 0.016) +
+        sanctuaryPresence * 0.085) *
+      OUTPUT_GAIN;
+
+    const portalTarget =
+      ((mix.portal * presenceScalar) + portalPresence * 0.85) *
+      (0.078 + voiceBrightness * 0.026 + voiceAir * 0.02) *
+      OUTPUT_GAIN;
+
+    const bedTarget =
+      (0.038 +
+        roomPresence * 0.018 +
+        voiceMain * 0.012 +
+        sanctuaryPresence * 0.028) *
+      OUTPUT_GAIN;
+
+    const airTarget =
+      (0.008 +
+        portalPresence * 0.012 +
+        roomPresence * 0.004 +
+        voiceBrightness * 0.004 +
+        voiceAir * 0.004 +
+        sanctuaryPresence * 0.006) *
+      OUTPUT_GAIN;
 
     rampParam(lowBed.output.gain, bedTarget, ctx, 0.28);
     rampParam(arrival.output.gain, arrivalTarget, ctx, 0.22);
@@ -273,7 +301,13 @@ export function createRitualSoundEngine() {
     const lowBedFreq = 145 + Math.sin(elapsed * 0.18) * 16 + voiceMain * 10;
     const arrivalFreq = 380 + Math.sin(elapsed * 0.52) * 28 + voiceBrightness * 56 + voiceAir * 24;
     const signalFreq = 820 + Math.sin(elapsed * 2.1) * 180 + roomPresence * 90 + voiceImpulse * 180 + voiceBrightness * 110;
-    const membraneFreq = 680 + Math.sin(elapsed * 0.94) * 120 + roomPresence * 70 + voiceBreath * 120 + voiceMain * 96;
+    const membraneFreq =
+      680 +
+      Math.sin(elapsed * 0.94) * 120 +
+      roomPresence * 70 +
+      voiceBreath * 120 +
+      voiceMain * 96 +
+      sanctuaryPresence * 260;
     const portalFreq = 1180 + Math.sin(elapsed * 1.6) * 180 + portalPresence * 320 + voiceBrightness * 180 + voiceAir * 90;
     const airFreq = 1700 + Math.sin(elapsed * 0.4) * 120 + portalPresence * 260 + voiceBrightness * 150;
 
@@ -338,6 +372,7 @@ export function createRitualSoundEngine() {
     resume,
     setRoomState,
     setPortalPresence,
+    setSanctuaryPresence,
     setVoiceFeatures,
     update,
     dispose,

@@ -6,6 +6,11 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { VRButton } from "three/examples/jsm/webxr/VRButton.js";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
+import { createTempleSanctuary } from "../../xr-experiences/consciousness/runtime/createTempleSanctuary.js";
+import { templeSanctuaryPreset } from "../../xr-experiences/consciousness/presets/templeSanctuaryPreset.js";
+import { sanctuaryExtractionPreset } from "../../xr-experiences/consciousness/presets/sanctuaryExtractionPreset.js";
+import { createMembraneCore } from "../../xr-experiences/consciousness/runtime/createMembraneCore.js";
+import { hideLegacyWorldRooms } from "../../xr-experiences/consciousness/runtime/hideLegacyWorldRooms.js";
 import { createEnvironmentShell } from "./helpers/createEnvironmentShell.js";
 import { createGateCue } from "./helpers/createGateCue.js";
 import { createInteractionShell } from "./helpers/createInteractionShell.js";
@@ -445,13 +450,25 @@ export default function XRRootThree({ manifest, options, xrSupported, xrChecked,
     scene.background = new THREE.Color(WORLD_VISUALS.baseBg);
     scene.fog = new THREE.FogExp2(WORLD_VISUALS.baseBg, WORLD_VISUALS.fogDensity);
 
+    const spawnPreset = templeSanctuaryPreset.spawn ?? templeSanctuaryPreset.userSpawn;
+
     const camera = new THREE.PerspectiveCamera(66, width / height, 0.01, 220);
-    camera.position.set(0, 1.68, 0);
+    camera.position.set(0, spawnPreset.position.y, 0);
 
     const rig = new THREE.Group();
-    rig.position.set(0, 0, 3.9);
+    rig.position.set(
+      spawnPreset.position.x,
+      0,
+      spawnPreset.position.z
+    );
     rig.add(camera);
     scene.add(rig);
+
+    camera.lookAt(
+      spawnPreset.lookAt.x,
+      spawnPreset.lookAt.y,
+      spawnPreset.lookAt.z
+    );
 
     const desktopSpawnSnapshot = {
       rigPosition: rig.position.clone(),
@@ -633,6 +650,9 @@ export default function XRRootThree({ manifest, options, xrSupported, xrChecked,
     const stillnessField = createStillnessField();
     scene.add(stillnessField.group);
 
+    const templeSanctuary = createTempleSanctuary();
+    scene.add(templeSanctuary.root);
+
     const spacing = options?.layout?.spacing ?? 7.2;
     const curveAmp = options?.layout?.curveAmp ?? 0.62;
     const curveX = (index) => Math.sin(index * 0.72) * curveAmp;
@@ -744,19 +764,46 @@ let latestVoiceState = {
       return entry;
     });
 
-    const arrivalEntry = roomEntries.find((entry) => entry.room.id === "hall-of-arrival");
+    const membraneEntry = roomEntries.find(
+      (entry) => entry.room.id === "membrane-chamber"
+    );
 
-    if (arrivalEntry?.elements?.celestialSky?.group) {
-      scene.add(arrivalEntry.elements.celestialSky.group);
+    const membraneCore = createMembraneCore();
+    templeSanctuary.chamberAnchor.add(membraneCore.root);
+
+    hideLegacyWorldRooms({
+      roomEntries,
+      keepByRoomId: sanctuaryExtractionPreset.legacyVisibility,
+    });
+
+    const arrivalSkyEntry = roomEntries.find((entry) => entry.room.id === "hall-of-arrival");
+    const detachedArrivalSkyRoot =
+      arrivalSkyEntry?.elements?.celestialSky?.root ?? arrivalSkyEntry?.elements?.celestialSky?.group ?? null;
+
+    if (detachedArrivalSkyRoot && detachedArrivalSkyRoot.parent !== scene) {
+      scene.attach(detachedArrivalSkyRoot);
+      detachedArrivalSkyRoot.visible = true;
+    }
+
+    const signalEntry = roomEntries.find((entry) => entry.room.id === "signal-corridor");
+    const portalEntry = roomEntries.find((entry) => entry.room.id === "portal-atrium");
+
+    [arrivalSkyEntry, signalEntry, portalEntry].forEach((entry) => {
+      if (!entry?.group) return;
+      entry.group.visible = false;
+    });
+
+    if (arrivalSkyEntry?.elements?.celestialSky?.group) {
+      scene.add(arrivalSkyEntry.elements.celestialSky.group);
     }
 
     const fallingStars =
-      arrivalEntry?.elements?.celestialSky?.layers?.anchor
+      arrivalSkyEntry?.elements?.celestialSky?.layers?.anchor
         ? createArrivalFallingStarsSystem()
         : null;
 
-    if (fallingStars && arrivalEntry?.elements?.celestialSky?.layers?.anchor) {
-      arrivalEntry.elements.celestialSky.layers.anchor.add(fallingStars.group);
+    if (fallingStars && arrivalSkyEntry?.elements?.celestialSky?.layers?.anchor) {
+      arrivalSkyEntry.elements.celestialSky.layers.anchor.add(fallingStars.group);
     }
 
     const constellationLoreEntry = getConstellationLoreEntry("great-bear-01");
@@ -764,20 +811,20 @@ let latestVoiceState = {
     const constellationOverlay = createConstellationLoreOverlay({ scene });
 
     const constellationFocus =
-      arrivalEntry?.elements?.celestialSky
+      arrivalSkyEntry?.elements?.celestialSky
         ? createConstellationFocusSystem({
             camera,
-            skySystem: arrivalEntry.elements.celestialSky,
+            skySystem: arrivalSkyEntry.elements.celestialSky,
             entry: constellationLoreEntry,
           })
         : null;
 
     const constellationReveal =
-      arrivalEntry?.elements?.celestialSky
+      arrivalSkyEntry?.elements?.celestialSky
         ? createConstellationRevealController({
             scene,
             camera,
-            skySystem: arrivalEntry.elements.celestialSky,
+            skySystem: arrivalSkyEntry.elements.celestialSky,
             entry: constellationLoreEntry,
             overlay: constellationOverlay,
           })
@@ -886,7 +933,8 @@ let latestVoiceState = {
     portalCore.position.set(0, 1.84, -0.03);
     portalGroup.add(portalCore);
 
-scene.add(portalGroup);
+    scene.add(portalGroup);
+    portalGroup.visible = false;
 
     const portalInvocation = createPortalInvocationProto();
     portalGroup.add(portalInvocation.group);
@@ -1468,7 +1516,9 @@ activeStillRoom = nearest.room;
       });
 
       gateCue.update(dtMs);
-    };    renderer.setAnimationLoop(() => {
+    };
+
+    renderer.setAnimationLoop(() => {
       const dtSec = clock.getDelta();
       const dtMs = dtSec * 1000;
       const elapsed = clock.elapsedTime;
@@ -1481,7 +1531,11 @@ activeStillRoom = nearest.room;
       locomotion.updateDesktopMove(dtSec);
       locomotion.updateSnapTurn(nowMs);
 
-updateRooms(elapsed, latestVoiceState);
+      const sanctuaryPresence =
+        templeSanctuary.update(dtSec, camera) ?? 0;
+      ritualSound.setSanctuaryPresence?.(sanctuaryPresence);
+      membraneCore.update(dtSec);
+      updateRooms(elapsed, latestVoiceState);
       updatePortal(elapsed, dtSec, dtMs, latestVoiceState);
 
       if (fallingStars) {
@@ -1581,6 +1635,11 @@ updateRooms(elapsed, latestVoiceState);
       try { environment.dispose(); } catch {}
       try { ritualSound.dispose(); } catch {}
       try { voiceSeed.dispose(); } catch {}
+      try { templeSanctuary.dispose(); } catch {}
+      try { membraneCore.dispose(); } catch {}
+      if (detachedArrivalSkyRoot?.parent === scene) {
+        scene.remove(detachedArrivalSkyRoot);
+      }
 
       try {
         disposeObjectTree(portalGroup);
