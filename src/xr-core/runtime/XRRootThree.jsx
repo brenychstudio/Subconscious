@@ -1190,22 +1190,20 @@ let latestVoiceState = {
       const { celestialSky, groundRingA, groundRingB } = entry.elements;
       const wave = 0.5 + Math.sin(elapsed * 0.72) * 0.5;
 
-      const shouldShowSky =
-        runtimeState.currentRoomId === entry.room.id ||
-        !runtimeState.currentRoomId ||
-        emphasis > 0.015;
+      // SKY-LOCK-09B.1
+      // During Scene 01 mastering, the arrival sky is treated as a global
+      // world-scale atmosphere layer. Do not hide it when room/world state changes.
+      const shouldShowSky = true;
 
       celestialSky.setEnabled(shouldShowSky);
 
-      if (shouldShowSky) {
-        updateArrivalCelestialSkySystem(celestialSky, {
-          elapsed,
-          emphasis,
-          voice,
-          roomId: entry.room.id,
-          viewer: worldPos,
-        });
-      }
+      updateArrivalCelestialSkySystem(celestialSky, {
+        elapsed,
+        emphasis,
+        voice,
+        roomId: runtimeState.currentRoomId ?? entry.room.id,
+        viewer: worldPos,
+      });
 
       groundRingA.material.opacity =
         0.012 +
