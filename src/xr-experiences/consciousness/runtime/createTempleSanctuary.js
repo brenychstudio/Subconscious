@@ -2019,6 +2019,12 @@ export function createTempleSanctuary() {
   let scene02RuntimeSwitchStubHoldTime = 0;
   let scene02RuntimeSwitchStubArmed = false;
   let scene02RuntimeSwitchStubLevel = 0;
+  let scene02AdapterObjectHoldTime = 0;
+  let scene02AdapterObjectReady = false;
+  let scene02AdapterObjectLevel = 0;
+  let scene02LocalSceneIdSwitchHoldTime = 0;
+  let scene02LocalSceneIdSwitchReady = false;
+  let scene02LocalSceneIdSwitchLevel = 0;
 
   // SCENE02-BOOTSTRAP-02 - minimal local scene-state registry.
   // This is intentionally local to Scene 01 runtime for now.
@@ -2051,6 +2057,9 @@ export function createTempleSanctuary() {
       runtimeSwitchStubArmed: false,
       runtimeSwitchStubLevel: 0,
       runtimeSwitchStub: null,
+      adapterObjectReady: false,
+      adapterObjectLevel: 0,
+      adapterObject: null,
       isCurrent: false,
       isComplete: false,
     },
@@ -2073,6 +2082,9 @@ export function createTempleSanctuary() {
     scene02RuntimeSwitchStubArmedValue = false,
     scene02RuntimeSwitchStubLevelValue = 0,
     scene02RuntimeSwitchStub = null,
+    scene02AdapterObjectReadyValue = false,
+    scene02AdapterObjectLevelValue = 0,
+    scene02AdapterObject = null,
   }) {
   localSceneStateRegistry.scene01.phase = scene01Phase;
   localSceneStateRegistry.scene01.isComplete = scene01Complete;
@@ -2095,11 +2107,22 @@ export function createTempleSanctuary() {
     localSceneStateRegistry.scene02.runtimeSwitchStubArmed = scene02RuntimeSwitchStubArmedValue;
     localSceneStateRegistry.scene02.runtimeSwitchStubLevel = scene02RuntimeSwitchStubLevelValue;
     localSceneStateRegistry.scene02.runtimeSwitchStub = scene02RuntimeSwitchStub;
+    // SCENE02-BOOTSTRAP-07C — registry binding only.
+    // Adapter object is now exposed through sceneRegistry,
+    // but this does not switch scenes, teleport, or mutate currentLocalSceneId.
+    localSceneStateRegistry.scene02.adapterObjectReady = scene02AdapterObjectReadyValue;
+    localSceneStateRegistry.scene02.adapterObjectLevel = scene02AdapterObjectLevelValue;
+    localSceneStateRegistry.scene02.adapterObject = scene02AdapterObject;
     localSceneStateRegistry.scene02.isCurrent = scene02HandoffReady;
   }
 
   root.userData.sceneRegistry = localSceneStateRegistry;
   root.userData.scene02 = localSceneStateRegistry.scene02;
+  // SCENE02-BOOTSTRAP-07D - local scene id state.
+  // Semantic marker only. No teleport, no visual switch, no room switch.
+  root.userData.currentLocalSceneId = root.userData.currentLocalSceneId ?? "scene01-sanctuary";
+  root.userData.previousLocalSceneId = root.userData.previousLocalSceneId ?? null;
+  root.userData.localSceneSwitchMode = root.userData.localSceneSwitchMode ?? "none";
 
   function createScene02SwitchContract({
     ready = false,
@@ -2272,6 +2295,73 @@ export function createTempleSanctuary() {
     };
   }
 
+  // SCENE02-BOOTSTRAP-07B - Adapter Object Only.
+  // Object-only adapter descriptor. No registry mutation, no currentLocalSceneId,
+  // no room switch, no teleport, no visual changes.
+  function createScene02AdapterObject({
+    ready = false,
+    level = 0,
+    phase = "not-ready",
+    diagnostic = null,
+    switchContract = null,
+    runtimeSwitchStub = null,
+    proximity = 0,
+  }) {
+    const diagnosticSafe = Boolean(diagnostic?.safeForFutureAdapter);
+    const contractReady = Boolean(switchContract?.ready);
+    const stubArmed = Boolean(runtimeSwitchStub?.armed);
+
+    return {
+      version: "scene02-adapter-object-v0.1",
+
+      type: "adapter-object-only",
+      ready,
+      level,
+      phase,
+
+      sourceSceneId: "scene01-sanctuary",
+      targetSceneId: "scene02-path-into-unknown",
+
+      adapterMode: "descriptor-only",
+      transitionType: "soft-passage",
+      entryAnchor: "path-threshold-forward",
+      entryDirection: "forward-through-portal",
+
+      gates: {
+        diagnosticSafe,
+        contractReady,
+        runtimeSwitchStubArmed: stubArmed,
+        proximityReady: proximity > 0.68,
+      },
+
+      canPromoteToAdapterDraft:
+        ready && diagnosticSafe && contractReady && stubArmed && proximity > 0.68,
+
+      runtime: {
+        proximity,
+        diagnosticPhase: diagnostic?.phase ?? "unknown",
+        switchContractPhase: switchContract?.phase ?? "unknown",
+        runtimeSwitchStubPhase: runtimeSwitchStub?.phase ?? "unknown",
+        runtimeSwitchStubLevel: runtimeSwitchStub?.level ?? 0,
+      },
+
+      safety: {
+        mutatesRegistryNow: false,
+        mutatesCurrentLocalSceneIdNow: false,
+        performsNavigationNow: false,
+        performsTeleportNow: false,
+        performsRoomSwitchNow: false,
+        touchesSkyNow: false,
+        touchesXRRootNow: false,
+        visualChangesNow: false,
+      },
+
+      nextStep: ready
+        ? "Ready for 07C: registry binding can be added separately."
+        : "Waiting for diagnostic/runtime-switch readiness.",
+    };
+  }
+
   root.userData.scene02RuntimeSwitch = createScene02RuntimeSwitchStub({
     armed: false,
     level: 0,
@@ -2281,6 +2371,15 @@ export function createTempleSanctuary() {
   });
   root.userData.scene02RuntimeDiagnostic = createScene02RuntimeDiagnostic({
     transitionState: root.userData.scene01Transition ?? null,
+    switchContract: root.userData.scene02SwitchContract ?? null,
+    runtimeSwitchStub: root.userData.scene02RuntimeSwitch ?? null,
+    proximity: 0,
+  });
+  root.userData.scene02AdapterObject = createScene02AdapterObject({
+    ready: false,
+    level: 0,
+    phase: "not-ready",
+    diagnostic: root.userData.scene02RuntimeDiagnostic ?? null,
     switchContract: root.userData.scene02SwitchContract ?? null,
     runtimeSwitchStub: root.userData.scene02RuntimeSwitch ?? null,
     proximity: 0,
@@ -3881,6 +3980,116 @@ export function createTempleSanctuary() {
         runtimeSwitchStub: scene02RuntimeSwitchStub,
         proximity: transitionZoneLevel,
       });
+      // SCENE02-BOOTSTRAP-07B - update adapter object only.
+      // This only creates/exposes an object. It does not mutate registry,
+      // does not set currentLocalSceneId, and does not trigger any visual/runtime switch.
+      const scene02RuntimeDiagnostic = root.userData.scene02RuntimeDiagnostic;
+
+      const canPrepareScene02AdapterObject =
+        Boolean(scene02RuntimeDiagnostic?.safeForFutureAdapter) &&
+        Boolean(scene02SwitchContract?.ready) &&
+        Boolean(scene02RuntimeSwitchStub?.armed) &&
+        scene02RuntimeSwitchStubLevel > 0.72 &&
+        transitionZoneLevel > 0.68;
+
+      if (canPrepareScene02AdapterObject && !scene02AdapterObjectReady) {
+        scene02AdapterObjectHoldTime += deltaSeconds;
+
+        if (scene02AdapterObjectHoldTime > 0.65) {
+          scene02AdapterObjectReady = true;
+        }
+      } else if (!scene02AdapterObjectReady) {
+        scene02AdapterObjectHoldTime = Math.max(
+          0,
+          scene02AdapterObjectHoldTime - deltaSeconds * 0.75
+        );
+      }
+
+      const scene02AdapterObjectTarget = scene02AdapterObjectReady ? 1 : 0;
+
+      scene02AdapterObjectLevel = THREE.MathUtils.lerp(
+        scene02AdapterObjectLevel,
+        scene02AdapterObjectTarget,
+        0.04
+      );
+
+      const scene02AdapterObject = createScene02AdapterObject({
+        ready: scene02AdapterObjectReady,
+        level: scene02AdapterObjectLevel,
+        phase: scene02AdapterObjectReady
+          ? "adapter-object-ready"
+          : canPrepareScene02AdapterObject
+            ? "adapter-object-preparing"
+            : "not-ready",
+        diagnostic: scene02RuntimeDiagnostic,
+        switchContract: scene02SwitchContract,
+        runtimeSwitchStub: scene02RuntimeSwitchStub,
+        proximity: transitionZoneLevel,
+      });
+
+      root.userData.scene02AdapterObject = scene02AdapterObject;
+      // SCENE02-BOOTSTRAP-07D - Local Scene Id Switch Only.
+      // This changes only semantic userData ids after the adapter object is ready.
+      // It does NOT teleport, does NOT switch rooms, does NOT change visuals, and does NOT touch sky.
+      const canSwitchLocalSceneIdToScene02 =
+        scene02AdapterObjectReady &&
+        scene02AdapterObjectLevel > 0.76 &&
+        Boolean(root.userData.sceneRegistry?.scene02?.adapterObject) &&
+        transitionZoneLevel > 0.68;
+
+      if (canSwitchLocalSceneIdToScene02 && !scene02LocalSceneIdSwitchReady) {
+        scene02LocalSceneIdSwitchHoldTime += deltaSeconds;
+
+        if (scene02LocalSceneIdSwitchHoldTime > 0.55) {
+          scene02LocalSceneIdSwitchReady = true;
+        }
+      } else if (!scene02LocalSceneIdSwitchReady) {
+        scene02LocalSceneIdSwitchHoldTime = Math.max(
+          0,
+          scene02LocalSceneIdSwitchHoldTime - deltaSeconds * 0.75
+        );
+      }
+
+      const scene02LocalSceneIdSwitchTarget = scene02LocalSceneIdSwitchReady ? 1 : 0;
+
+      scene02LocalSceneIdSwitchLevel = THREE.MathUtils.lerp(
+        scene02LocalSceneIdSwitchLevel,
+        scene02LocalSceneIdSwitchTarget,
+        0.04
+      );
+
+      if (scene02LocalSceneIdSwitchReady) {
+        root.userData.previousLocalSceneId = "scene01-sanctuary";
+        root.userData.currentLocalSceneId = "scene02-path-into-unknown";
+        root.userData.localSceneSwitchMode = "semantic-local-id-only";
+      } else {
+        root.userData.currentLocalSceneId =
+          root.userData.currentLocalSceneId ?? "scene01-sanctuary";
+        root.userData.localSceneSwitchMode =
+          root.userData.localSceneSwitchMode ?? "none";
+      }
+
+      root.userData.scene02LocalSceneIdSwitch = {
+        version: "scene02-local-scene-id-switch-v0.1",
+        ready: scene02LocalSceneIdSwitchReady,
+        level: scene02LocalSceneIdSwitchLevel,
+        phase: scene02LocalSceneIdSwitchReady
+          ? "local-scene-id-switched"
+          : canSwitchLocalSceneIdToScene02
+            ? "local-scene-id-preparing"
+            : "not-ready",
+        previousLocalSceneId: root.userData.previousLocalSceneId,
+        currentLocalSceneId: root.userData.currentLocalSceneId,
+        mode: root.userData.localSceneSwitchMode,
+        safety: {
+          semanticOnly: true,
+          performsTeleportNow: false,
+          performsRoomSwitchNow: false,
+          changesVisualsNow: false,
+          touchesSkyNow: false,
+          touchesXRRootNow: false,
+        },
+      };
 
       // SCENE02-BOOTSTRAP-02 - derive minimal scene02 state.
       // Still no navigation, no teleport, no room switch.
@@ -3950,6 +4159,9 @@ export function createTempleSanctuary() {
         scene02RuntimeSwitchStubArmedValue: scene02RuntimeSwitchStubArmed,
         scene02RuntimeSwitchStubLevelValue: scene02RuntimeSwitchStubLevel,
         scene02RuntimeSwitchStub,
+        scene02AdapterObjectReadyValue: scene02AdapterObjectReady,
+        scene02AdapterObjectLevelValue: scene02AdapterObjectLevel,
+        scene02AdapterObject: root.userData.scene02AdapterObject ?? null,
       });
 
       // Public readiness state for future real Scene 02 transition.
@@ -3983,6 +4195,18 @@ export function createTempleSanctuary() {
         scene02RuntimeSwitchStubArmed,
         scene02RuntimeSwitchStubLevel,
         scene02RuntimeSwitchStubPhase: scene02RuntimeSwitchStub.phase,
+        scene02AdapterObjectReady,
+        scene02AdapterObjectLevel,
+        scene02AdapterObjectPhase: root.userData.scene02AdapterObject?.phase ?? "not-ready",
+        scene02AdapterObjectBoundToRegistry:
+          Boolean(root.userData.sceneRegistry?.scene02?.adapterObject),
+        scene02LocalSceneIdSwitchReady,
+        scene02LocalSceneIdSwitchLevel,
+        scene02LocalSceneIdSwitchPhase:
+          root.userData.scene02LocalSceneIdSwitch?.phase ?? "not-ready",
+        currentLocalSceneId: root.userData.currentLocalSceneId ?? "scene01-sanctuary",
+        previousLocalSceneId: root.userData.previousLocalSceneId ?? null,
+        localSceneSwitchMode: root.userData.localSceneSwitchMode ?? "none",
         hold: firstPassageHoldTime,
         readiness: transitionReadinessLevel,
         proximity: transitionZoneLevel,
@@ -4083,6 +4307,16 @@ export function createTempleSanctuary() {
         scene02RuntimeSwitchStubArmed: false,
         scene02RuntimeSwitchStubLevel: 0,
         scene02RuntimeSwitchStubPhase: "not-ready",
+        scene02AdapterObjectReady: false,
+        scene02AdapterObjectLevel: 0,
+        scene02AdapterObjectPhase: "not-ready",
+        scene02AdapterObjectBoundToRegistry: false,
+        scene02LocalSceneIdSwitchReady: false,
+        scene02LocalSceneIdSwitchLevel: 0,
+        scene02LocalSceneIdSwitchPhase: "not-ready",
+        currentLocalSceneId: "scene01-sanctuary",
+        previousLocalSceneId: null,
+        localSceneSwitchMode: "none",
         hold: 0,
         readiness: 0,
         proximity: 0,
@@ -4121,6 +4355,36 @@ export function createTempleSanctuary() {
         runtimeSwitchStub: root.userData.scene02RuntimeSwitch ?? null,
         proximity: 0,
       });
+    },
+    getScene02AdapterObject() {
+      return root.userData.scene02AdapterObject ?? createScene02AdapterObject({
+        ready: false,
+        level: 0,
+        phase: "not-ready",
+        diagnostic: root.userData.scene02RuntimeDiagnostic ?? null,
+        switchContract: root.userData.scene02SwitchContract ?? null,
+        runtimeSwitchStub: root.userData.scene02RuntimeSwitch ?? null,
+        proximity: 0,
+      });
+    },
+    getScene02LocalSceneIdSwitch() {
+      return root.userData.scene02LocalSceneIdSwitch ?? {
+        version: "scene02-local-scene-id-switch-v0.1",
+        ready: false,
+        level: 0,
+        phase: "not-ready",
+        previousLocalSceneId: root.userData.previousLocalSceneId ?? null,
+        currentLocalSceneId: root.userData.currentLocalSceneId ?? "scene01-sanctuary",
+        mode: root.userData.localSceneSwitchMode ?? "none",
+        safety: {
+          semanticOnly: true,
+          performsTeleportNow: false,
+          performsRoomSwitchNow: false,
+          changesVisualsNow: false,
+          touchesSkyNow: false,
+          touchesXRRootNow: false,
+        },
+      };
     },
     isRitualChargeComplete() {
       return ritualChargeComplete;
