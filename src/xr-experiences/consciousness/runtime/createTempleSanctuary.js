@@ -1748,6 +1748,33 @@ export function createTempleSanctuary() {
   scene02GuideLight.position.set(0, 0, -2.2);
   scene02ShellRoot.add(scene02GuideLight);
 
+  // SCENE02-BOOTSTRAP-07F — Scene02 Runtime Container Preparation.
+  // Empty container root only. Existing Scene02 visual layers are NOT reparented yet.
+  // No teleport, no room switch, no XRRoot changes, no sky changes.
+  const scene02RuntimeContainerRoot = new THREE.Group();
+  scene02RuntimeContainerRoot.name = "PathIntoUnknownRuntimeContainer";
+  scene02RuntimeContainerRoot.visible = false;
+  scene02RuntimeContainerRoot.position.set(0, 0, -1.18);
+  transitionPortalRoot.add(scene02RuntimeContainerRoot);
+
+  scene02RuntimeContainerRoot.userData = {
+    version: "scene02-runtime-container-v0.1",
+    sceneId: "scene02-path-into-unknown",
+    prepared: false,
+    level: 0,
+    mode: "empty-container-preparation",
+    acceptsFutureChildren: true,
+    currentChildrenBound: false,
+    safety: {
+      emptyContainerOnly: true,
+      existingLayersReparentedNow: false,
+      performsTeleportNow: false,
+      performsRoomSwitchNow: false,
+      touchesSkyNow: false,
+      touchesXRRootNow: false,
+    },
+  };
+
   // SCENE02-BOOTSTRAP-03 - Scene02 Visual Isolation Layer.
   // This starts separating Scene 02 as its own visual state.
   // No teleport, no room switch, no sky/global runtime changes.
@@ -2026,6 +2053,9 @@ export function createTempleSanctuary() {
   let scene02LocalSceneIdSwitchReady = false;
   let scene02LocalSceneIdSwitchLevel = 0;
   let scene02SemanticVisualPriorityLevel = 0;
+  let scene02RuntimeContainerHoldTime = 0;
+  let scene02RuntimeContainerPrepared = false;
+  let scene02RuntimeContainerLevel = 0;
 
   // SCENE02-BOOTSTRAP-02 - minimal local scene-state registry.
   // This is intentionally local to Scene 01 runtime for now.
@@ -2061,6 +2091,9 @@ export function createTempleSanctuary() {
       adapterObjectReady: false,
       adapterObjectLevel: 0,
       adapterObject: null,
+      runtimeContainerPrepared: false,
+      runtimeContainerLevel: 0,
+      runtimeContainer: null,
       isCurrent: false,
       isComplete: false,
     },
@@ -2086,6 +2119,9 @@ export function createTempleSanctuary() {
     scene02AdapterObjectReadyValue = false,
     scene02AdapterObjectLevelValue = 0,
     scene02AdapterObject = null,
+    scene02RuntimeContainerPreparedValue = false,
+    scene02RuntimeContainerLevelValue = 0,
+    scene02RuntimeContainer = null,
   }) {
   localSceneStateRegistry.scene01.phase = scene01Phase;
   localSceneStateRegistry.scene01.isComplete = scene01Complete;
@@ -2114,6 +2150,16 @@ export function createTempleSanctuary() {
     localSceneStateRegistry.scene02.adapterObjectReady = scene02AdapterObjectReadyValue;
     localSceneStateRegistry.scene02.adapterObjectLevel = scene02AdapterObjectLevelValue;
     localSceneStateRegistry.scene02.adapterObject = scene02AdapterObject;
+
+    // SCENE02-BOOTSTRAP-07F — runtime container registry binding.
+    // This only exposes the prepared empty container through sceneRegistry.
+    // It does not move visual layers yet.
+    localSceneStateRegistry.scene02.runtimeContainerPrepared =
+      scene02RuntimeContainerPreparedValue;
+    localSceneStateRegistry.scene02.runtimeContainerLevel =
+      scene02RuntimeContainerLevelValue;
+    localSceneStateRegistry.scene02.runtimeContainer = scene02RuntimeContainer;
+
     localSceneStateRegistry.scene02.isCurrent = scene02HandoffReady;
   }
 
@@ -4248,6 +4294,75 @@ export function createTempleSanctuary() {
         },
       };
 
+      // SCENE02-BOOTSTRAP-07F — Scene02 Container Preparation.
+      // Empty runtime container only. This prepares a future place for real Scene02 logic,
+      // but does not reparent existing visual layers yet.
+      const canPrepareScene02RuntimeContainer =
+        root.userData.currentLocalSceneId === "scene02-path-into-unknown" &&
+        scene02LocalSceneIdSwitchReady &&
+        scene02SemanticVisualPriorityLevel > 0.62 &&
+        Boolean(root.userData.sceneRegistry?.scene02?.adapterObject);
+
+      if (canPrepareScene02RuntimeContainer && !scene02RuntimeContainerPrepared) {
+        scene02RuntimeContainerHoldTime += deltaSeconds;
+
+        if (scene02RuntimeContainerHoldTime > 0.65) {
+          scene02RuntimeContainerPrepared = true;
+        }
+      } else if (!scene02RuntimeContainerPrepared) {
+        scene02RuntimeContainerHoldTime = Math.max(
+          0,
+          scene02RuntimeContainerHoldTime - deltaSeconds * 0.75
+        );
+      }
+
+      const scene02RuntimeContainerTarget = scene02RuntimeContainerPrepared ? 1 : 0;
+
+      scene02RuntimeContainerLevel = THREE.MathUtils.lerp(
+        scene02RuntimeContainerLevel,
+        scene02RuntimeContainerTarget,
+        0.04
+      );
+
+      scene02RuntimeContainerRoot.visible = scene02RuntimeContainerLevel > 0.01;
+
+      scene02RuntimeContainerRoot.userData = {
+        version: "scene02-runtime-container-v0.1",
+        sceneId: "scene02-path-into-unknown",
+        prepared: scene02RuntimeContainerPrepared,
+        level: scene02RuntimeContainerLevel,
+        phase: scene02RuntimeContainerPrepared
+          ? "scene02-container-prepared"
+          : canPrepareScene02RuntimeContainer
+            ? "scene02-container-preparing"
+            : "not-ready",
+        mode: "empty-container-preparation",
+        anchor: {
+          parent: "TempleSanctuaryTransitionPortalRoot",
+          entryAnchor: "path-threshold-forward",
+          entryDirection: "forward-through-portal",
+        },
+        acceptsFutureChildren: scene02RuntimeContainerPrepared,
+        currentChildrenBound: false,
+        existingVisualLayersStillInPlace: true,
+        futureBindingTargets: [
+          "PathIntoUnknownScene02Shell",
+          "PathIntoUnknownVisualIsolationLayer",
+          "TempleSanctuaryPreScene02Handoff",
+        ],
+        safety: {
+          emptyContainerOnly: true,
+          existingLayersReparentedNow: false,
+          performsTeleportNow: false,
+          performsRoomSwitchNow: false,
+          changesCameraNow: false,
+          touchesSkyNow: false,
+          touchesXRRootNow: false,
+        },
+      };
+
+      root.userData.scene02RuntimeContainer = scene02RuntimeContainerRoot.userData;
+
       // SCENE02-BOOTSTRAP-02 - derive minimal scene02 state.
       // Still no navigation, no teleport, no room switch.
       const scene01TransitionPhase =
@@ -4319,6 +4434,9 @@ export function createTempleSanctuary() {
         scene02AdapterObjectReadyValue: scene02AdapterObjectReady,
         scene02AdapterObjectLevelValue: scene02AdapterObjectLevel,
         scene02AdapterObject: root.userData.scene02AdapterObject ?? null,
+        scene02RuntimeContainerPreparedValue: scene02RuntimeContainerPrepared,
+        scene02RuntimeContainerLevelValue: scene02RuntimeContainerLevel,
+        scene02RuntimeContainer: root.userData.scene02RuntimeContainer ?? null,
       });
 
       // Public readiness state for future real Scene 02 transition.
@@ -4369,6 +4487,10 @@ export function createTempleSanctuary() {
         scene02VisualResponseLevel: scene02SemanticVisualPriorityLevel,
         scene02VisualResponsePhase:
           root.userData.scene02VisualResponse?.phase ?? "not-active",
+        scene02RuntimeContainerPrepared,
+        scene02RuntimeContainerLevel,
+        scene02RuntimeContainerPhase:
+          root.userData.scene02RuntimeContainer?.phase ?? "not-ready",
         hold: firstPassageHoldTime,
         readiness: transitionReadinessLevel,
         proximity: transitionZoneLevel,
@@ -4482,6 +4604,9 @@ export function createTempleSanctuary() {
         scene02VisualResponseActive: false,
         scene02VisualResponseLevel: 0,
         scene02VisualResponsePhase: "not-active",
+        scene02RuntimeContainerPrepared: false,
+        scene02RuntimeContainerLevel: 0,
+        scene02RuntimeContainerPhase: "not-ready",
         hold: 0,
         readiness: 0,
         proximity: 0,
@@ -4570,6 +4695,38 @@ export function createTempleSanctuary() {
     },
     isRitualChargeComplete() {
       return ritualChargeComplete;
+    },
+    getScene02RuntimeContainer() {
+      return root.userData.scene02RuntimeContainer ?? {
+        version: "scene02-runtime-container-v0.1",
+        sceneId: "scene02-path-into-unknown",
+        prepared: false,
+        level: 0,
+        phase: "not-ready",
+        mode: "empty-container-preparation",
+        anchor: {
+          parent: "TempleSanctuaryTransitionPortalRoot",
+          entryAnchor: "path-threshold-forward",
+          entryDirection: "forward-through-portal",
+        },
+        acceptsFutureChildren: false,
+        currentChildrenBound: false,
+        existingVisualLayersStillInPlace: true,
+        futureBindingTargets: [
+          "PathIntoUnknownScene02Shell",
+          "PathIntoUnknownVisualIsolationLayer",
+          "TempleSanctuaryPreScene02Handoff",
+        ],
+        safety: {
+          emptyContainerOnly: true,
+          existingLayersReparentedNow: false,
+          performsTeleportNow: false,
+          performsRoomSwitchNow: false,
+          changesCameraNow: false,
+          touchesSkyNow: false,
+          touchesXRRootNow: false,
+        },
+      };
     },
     getTransformationCueLevel() {
       return transformationCueLevel;
