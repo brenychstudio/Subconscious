@@ -1950,6 +1950,89 @@ export function createTempleSanctuary() {
   scene02PathStreakLines.renderOrder = 90;
   scene02CinematicPathRoot.add(scene02PathStreakLines);
 
+  // SCENE02-VISUAL-02 — additional acceleration streak field.
+  // Gives the path stronger forward motion without camera teleport or room switch.
+  const scene02PathAccelerationCount = 96;
+  const scene02PathAccelerationPositions = new Float32Array(
+    scene02PathAccelerationCount * 2 * 3
+  );
+
+  const scene02PathAccelerationSeeds = Array.from(
+    { length: scene02PathAccelerationCount },
+    (_, index) => {
+      const lane = index % 6;
+      const angle = index * 2.399963 + lane * 0.37;
+
+      return {
+        angle,
+        lane,
+        radius: 0.48 + (((index * 41) % 100) / 100) * 1.55,
+        z: -8.6 + (((index * 67) % 100) / 100) * 8.4,
+        speed: 1.15 + (((index * 23) % 100) / 100) * 2.8,
+        length: 0.38 + (((index * 19) % 100) / 100) * 0.78,
+        twist: index % 2 === 0 ? 1 : -1,
+        brightness: 0.62 + (((index * 13) % 100) / 100) * 0.38,
+      };
+    }
+  );
+
+  const scene02PathAccelerationGeometry = new THREE.BufferGeometry();
+  scene02PathAccelerationGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(scene02PathAccelerationPositions, 3)
+  );
+
+  const scene02PathAccelerationMaterial = new THREE.LineBasicMaterial({
+    color: 0xd8f6ff,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+  });
+
+  const scene02PathAccelerationLines = new THREE.LineSegments(
+    scene02PathAccelerationGeometry,
+    scene02PathAccelerationMaterial
+  );
+  scene02PathAccelerationLines.name = "Scene02AccelerationStreakField";
+  scene02PathAccelerationLines.renderOrder = 96;
+  scene02CinematicPathRoot.add(scene02PathAccelerationLines);
+
+  const scene02SideRailCount = 18;
+  const scene02SideRailPositions = new Float32Array(scene02SideRailCount * 2 * 3);
+  const scene02SideRailSeeds = Array.from(
+    { length: scene02SideRailCount },
+    (_, index) => ({
+      angle: index * ((Math.PI * 2) / scene02SideRailCount),
+      offset: (index % 3) * 0.17,
+      phase: index * 0.41,
+    })
+  );
+
+  const scene02SideRailGeometry = new THREE.BufferGeometry();
+  scene02SideRailGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(scene02SideRailPositions, 3)
+  );
+
+  const scene02SideRailMaterial = new THREE.LineBasicMaterial({
+    color: 0x72cfff,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+  });
+
+  const scene02SideRailLines = new THREE.LineSegments(
+    scene02SideRailGeometry,
+    scene02SideRailMaterial
+  );
+  scene02SideRailLines.name = "Scene02PeripheralPullRails";
+  scene02SideRailLines.renderOrder = 94;
+  scene02CinematicPathRoot.add(scene02SideRailLines);
+
   const scene02HazeSprites = [];
   const scene02HazeTexture = createScene02CinematicSoftDiscTexture({
     size: 96,
@@ -4831,7 +4914,7 @@ export function createTempleSanctuary() {
           );
           ring.rotation.z =
             ring.userData.rotationSeed +
-            t * ring.userData.rotationSpeed * THREE.MathUtils.lerp(1.0, 5.2, pullEnergy);
+            t * ring.userData.rotationSpeed * THREE.MathUtils.lerp(1.4, 7.6, pullEnergy);
 
           const fadeFront = THREE.MathUtils.smoothstep(loopDepth, 0.02, 0.18);
           const fadeBack = 1 - THREE.MathUtils.smoothstep(loopDepth, 0.78, 1.0);
@@ -4839,7 +4922,7 @@ export function createTempleSanctuary() {
             pathPresence *
             fadeFront *
             fadeBack *
-            THREE.MathUtils.lerp(0.045, 0.22, pullEnergy);
+            THREE.MathUtils.lerp(0.055, 0.30, pullEnergy);
 
           ring.material.opacity = THREE.MathUtils.lerp(
             ring.material.opacity,
@@ -4901,8 +4984,107 @@ export function createTempleSanctuary() {
 
         scene02PathStreakMaterial.opacity = THREE.MathUtils.lerp(
           scene02PathStreakMaterial.opacity,
-          pathPresence * THREE.MathUtils.lerp(0.10, 0.46, pullEnergy),
+          pathPresence * THREE.MathUtils.lerp(0.12, 0.62, pullEnergy),
           0.07
+        );
+
+        // SCENE02-VISUAL-02 — acceleration streak update.
+        // Stronger forward pull layer. Visual only. No camera movement.
+        for (let i = 0; i < scene02PathAccelerationSeeds.length; i += 1) {
+          const seed = scene02PathAccelerationSeeds[i];
+
+          seed.z +=
+            deltaSeconds *
+            seed.speed *
+            THREE.MathUtils.lerp(0.55, 7.8, pullEnergy);
+
+          if (seed.z > 0.58) {
+            seed.z = -8.9 - (((i * 43 + Math.floor(t * 19)) % 100) / 100) * 1.25;
+            seed.radius =
+              0.45 + (((i * 41 + Math.floor(t * 11)) % 100) / 100) * 1.62;
+          }
+
+          const depth01 = THREE.MathUtils.clamp((seed.z + 9.0) / 9.55, 0, 1);
+          const radiusCurve =
+            seed.radius * THREE.MathUtils.lerp(0.22, 2.15, depth01);
+
+          const spiral =
+            seed.angle +
+            seed.twist *
+              (t * THREE.MathUtils.lerp(0.06, 0.42, pullEnergy) + seed.z * 0.28);
+
+          const laneOffset = (seed.lane - 2.5) * 0.018 * pullEnergy;
+          const xHead = Math.cos(spiral + laneOffset) * radiusCurve;
+          const yHead = Math.sin(spiral + laneOffset) * radiusCurve * 0.72;
+
+          const tailZ = Math.max(
+            -9.6,
+            seed.z - seed.length * THREE.MathUtils.lerp(1.4, 6.2, pullEnergy)
+          );
+
+          const tailDepth01 = THREE.MathUtils.clamp((tailZ + 9.0) / 9.55, 0, 1);
+          const tailRadius =
+            seed.radius * THREE.MathUtils.lerp(0.18, 1.76, tailDepth01);
+
+          const tailSpiral =
+            spiral - seed.twist * THREE.MathUtils.lerp(0.04, 0.18, pullEnergy);
+
+          const xTail = Math.cos(tailSpiral) * tailRadius;
+          const yTail = Math.sin(tailSpiral) * tailRadius * 0.72;
+
+          const p = i * 6;
+
+          scene02PathAccelerationPositions[p + 0] = xHead;
+          scene02PathAccelerationPositions[p + 1] = yHead;
+          scene02PathAccelerationPositions[p + 2] = seed.z;
+
+          scene02PathAccelerationPositions[p + 3] = xTail;
+          scene02PathAccelerationPositions[p + 4] = yTail;
+          scene02PathAccelerationPositions[p + 5] = tailZ;
+        }
+
+        scene02PathAccelerationGeometry.getAttribute("position").needsUpdate = true;
+
+        scene02PathAccelerationMaterial.opacity = THREE.MathUtils.lerp(
+          scene02PathAccelerationMaterial.opacity,
+          pathPresence * THREE.MathUtils.lerp(0.035, 0.38, pullEnergy),
+          0.075
+        );
+
+        // Peripheral pull rails: subtle edge-language that makes the path feel deeper.
+        for (let i = 0; i < scene02SideRailSeeds.length; i += 1) {
+          const seed = scene02SideRailSeeds[i];
+
+          const angle =
+            seed.angle -
+            t * THREE.MathUtils.lerp(0.018, 0.18, pullEnergy) +
+            Math.sin(t * 0.11 + seed.phase) * 0.035;
+
+          const radiusNear =
+            THREE.MathUtils.lerp(1.18, 2.25, pullEnergy) + seed.offset;
+          const radiusFar =
+            THREE.MathUtils.lerp(0.24, 0.92, pullEnergy) + seed.offset * 0.2;
+
+          const nearZ = THREE.MathUtils.lerp(-1.15, -0.62, pullEnergy);
+          const farZ = THREE.MathUtils.lerp(-5.2, -8.1, pullEnergy);
+
+          const p = i * 6;
+
+          scene02SideRailPositions[p + 0] = Math.cos(angle) * radiusNear;
+          scene02SideRailPositions[p + 1] = Math.sin(angle) * radiusNear * 0.72;
+          scene02SideRailPositions[p + 2] = nearZ;
+
+          scene02SideRailPositions[p + 3] = Math.cos(angle + 0.075) * radiusFar;
+          scene02SideRailPositions[p + 4] = Math.sin(angle + 0.075) * radiusFar * 0.72;
+          scene02SideRailPositions[p + 5] = farZ;
+        }
+
+        scene02SideRailGeometry.getAttribute("position").needsUpdate = true;
+
+        scene02SideRailMaterial.opacity = THREE.MathUtils.lerp(
+          scene02SideRailMaterial.opacity,
+          pathPresence * THREE.MathUtils.lerp(0.018, 0.16, pullEnergy),
+          0.055
         );
 
         for (const haze of scene02HazeSprites) {
@@ -5037,6 +5219,9 @@ export function createTempleSanctuary() {
             rotatingDepthRings: true,
             forwardStreaks: true,
             localHaze: true,
+            accelerationStreaks: true,
+            peripheralPullRails: true,
+            forwardMotionPolish: true,
           },
           safety: {
             touchesSkyNow: false,
