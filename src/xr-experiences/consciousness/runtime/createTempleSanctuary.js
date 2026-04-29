@@ -2025,6 +2025,7 @@ export function createTempleSanctuary() {
   let scene02LocalSceneIdSwitchHoldTime = 0;
   let scene02LocalSceneIdSwitchReady = false;
   let scene02LocalSceneIdSwitchLevel = 0;
+  let scene02SemanticVisualPriorityLevel = 0;
 
   // SCENE02-BOOTSTRAP-02 - minimal local scene-state registry.
   // This is intentionally local to Scene 01 runtime for now.
@@ -4091,6 +4092,162 @@ export function createTempleSanctuary() {
         },
       };
 
+      // SCENE02-BOOTSTRAP-07E - Visual Response Only.
+      // Once the semantic local scene id is Scene 02, give Scene 02 more visual priority.
+      // No teleport, no hard room switch, no XRRoot changes, no sky changes.
+      const scene02SemanticVisualPriorityTarget =
+        root.userData.currentLocalSceneId === "scene02-path-into-unknown" &&
+        scene02LocalSceneIdSwitchReady
+          ? 1
+          : 0;
+
+      scene02SemanticVisualPriorityLevel = THREE.MathUtils.lerp(
+        scene02SemanticVisualPriorityLevel,
+        scene02SemanticVisualPriorityTarget,
+        0.035
+      );
+
+      const scene02VisualPriorityPresence = THREE.MathUtils.smoothstep(
+        scene02SemanticVisualPriorityLevel,
+        0.04,
+        1.0
+      );
+
+      if (scene02VisualPriorityPresence > 0.01) {
+        const visualPriorityBreath = 0.5 + 0.5 * Math.sin(t * 0.2);
+
+        // Scene 02 becomes visually primary.
+        scene02StreamMaterial.opacity +=
+          scene02VisualPriorityPresence *
+          THREE.MathUtils.lerp(0.16, 0.42, visualPriorityBreath);
+
+        scene02IsolationStreamMaterial.opacity +=
+          scene02VisualPriorityPresence *
+          THREE.MathUtils.lerp(0.08, 0.22, visualPriorityBreath);
+
+        preScene02StreamMaterial.opacity +=
+          scene02VisualPriorityPresence *
+          THREE.MathUtils.lerp(0.04, 0.14, visualPriorityBreath);
+
+        scene02GuideLight.intensity +=
+          scene02VisualPriorityPresence *
+          THREE.MathUtils.lerp(0.22, 0.72, visualPriorityBreath);
+
+        scene02IsolationLight.intensity +=
+          scene02VisualPriorityPresence *
+          THREE.MathUtils.lerp(0.08, 0.32, visualPriorityBreath);
+
+        preScene02GuideLight.intensity +=
+          scene02VisualPriorityPresence *
+          THREE.MathUtils.lerp(0.04, 0.18, visualPriorityBreath);
+
+        // Keep the portal alive as the threshold object, but avoid making old UI layers dominant.
+        transitionPortalLight.intensity +=
+          scene02VisualPriorityPresence *
+          THREE.MathUtils.lerp(0.06, 0.18, visualPriorityBreath);
+
+        transitionPortalRing.material.opacity *= THREE.MathUtils.lerp(
+          1.0,
+          0.84,
+          scene02VisualPriorityPresence
+        );
+
+        transitionPortalInnerRing.material.opacity *= THREE.MathUtils.lerp(
+          1.0,
+          0.78,
+          scene02VisualPriorityPresence
+        );
+
+        // Scene 01 support UI becomes secondary.
+        if (passagePromptRoot?.visible) {
+          passagePromptSprite.material.opacity *= THREE.MathUtils.lerp(
+            1.0,
+            0.34,
+            scene02VisualPriorityPresence
+          );
+
+          passagePromptNeedles.children.forEach((needle) => {
+            needle.material.opacity *= THREE.MathUtils.lerp(
+              1.0,
+              0.22,
+              scene02VisualPriorityPresence
+            );
+          });
+
+          passagePromptLight.intensity *= THREE.MathUtils.lerp(
+            1.0,
+            0.22,
+            scene02VisualPriorityPresence
+          );
+        }
+
+        if (transitionReadinessRoot?.visible) {
+          transitionReadinessRing.material.opacity *= THREE.MathUtils.lerp(
+            1.0,
+            0.46,
+            scene02VisualPriorityPresence
+          );
+
+          transitionReadinessInnerRing.material.opacity *= THREE.MathUtils.lerp(
+            1.0,
+            0.26,
+            scene02VisualPriorityPresence
+          );
+
+          transitionReadinessNeedles.children.forEach((needle) => {
+            needle.material.opacity *= THREE.MathUtils.lerp(
+              1.0,
+              0.28,
+              scene02VisualPriorityPresence
+            );
+          });
+
+          transitionReadinessGlow.intensity *= THREE.MathUtils.lerp(
+            1.0,
+            0.3,
+            scene02VisualPriorityPresence
+          );
+        }
+
+        // Old chamber release particles become background memory, not the main event.
+        if (chamberReleaseParticles?.visible) {
+          chamberReleaseMaterial.opacity *= THREE.MathUtils.lerp(
+            1.0,
+            0.48,
+            scene02VisualPriorityPresence
+          );
+        }
+
+        if (chamberDissolvePoints?.visible) {
+          dissolveMaterial.opacity *= THREE.MathUtils.lerp(
+            1.0,
+            0.46,
+            scene02VisualPriorityPresence
+          );
+        }
+      }
+
+      root.userData.scene02VisualResponse = {
+        version: "scene02-visual-response-v0.1",
+        active: scene02SemanticVisualPriorityLevel > 0.08,
+        level: scene02SemanticVisualPriorityLevel,
+        phase:
+          scene02SemanticVisualPriorityLevel > 0.72
+            ? "scene02-visual-priority"
+            : scene02SemanticVisualPriorityLevel > 0.08
+              ? "scene02-visual-priority-emerging"
+              : "not-active",
+        source: "currentLocalSceneId",
+        currentLocalSceneId: root.userData.currentLocalSceneId ?? "scene01-sanctuary",
+        safety: {
+          visualResponseOnly: true,
+          performsTeleportNow: false,
+          performsRoomSwitchNow: false,
+          mutatesXRRootNow: false,
+          touchesSkyNow: false,
+        },
+      };
+
       // SCENE02-BOOTSTRAP-02 - derive minimal scene02 state.
       // Still no navigation, no teleport, no room switch.
       const scene01TransitionPhase =
@@ -4207,6 +4364,11 @@ export function createTempleSanctuary() {
         currentLocalSceneId: root.userData.currentLocalSceneId ?? "scene01-sanctuary",
         previousLocalSceneId: root.userData.previousLocalSceneId ?? null,
         localSceneSwitchMode: root.userData.localSceneSwitchMode ?? "none",
+        scene02VisualResponseActive:
+          root.userData.scene02VisualResponse?.active ?? false,
+        scene02VisualResponseLevel: scene02SemanticVisualPriorityLevel,
+        scene02VisualResponsePhase:
+          root.userData.scene02VisualResponse?.phase ?? "not-active",
         hold: firstPassageHoldTime,
         readiness: transitionReadinessLevel,
         proximity: transitionZoneLevel,
@@ -4317,6 +4479,9 @@ export function createTempleSanctuary() {
         currentLocalSceneId: "scene01-sanctuary",
         previousLocalSceneId: null,
         localSceneSwitchMode: "none",
+        scene02VisualResponseActive: false,
+        scene02VisualResponseLevel: 0,
+        scene02VisualResponsePhase: "not-active",
         hold: 0,
         readiness: 0,
         proximity: 0,
@@ -4383,6 +4548,23 @@ export function createTempleSanctuary() {
           changesVisualsNow: false,
           touchesSkyNow: false,
           touchesXRRootNow: false,
+        },
+      };
+    },
+    getScene02VisualResponse() {
+      return root.userData.scene02VisualResponse ?? {
+        version: "scene02-visual-response-v0.1",
+        active: false,
+        level: 0,
+        phase: "not-active",
+        source: "currentLocalSceneId",
+        currentLocalSceneId: root.userData.currentLocalSceneId ?? "scene01-sanctuary",
+        safety: {
+          visualResponseOnly: true,
+          performsTeleportNow: false,
+          performsRoomSwitchNow: false,
+          mutatesXRRootNow: false,
+          touchesSkyNow: false,
         },
       };
     },
