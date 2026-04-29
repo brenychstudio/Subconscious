@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { templeSanctuaryPreset } from "../presets/templeSanctuaryPreset.js";
+import { createPathIntoUnknownSceneRuntime } from "./createPathIntoUnknownScene.js";
 
 function disposeMaterial(material) {
   if (!material) return;
@@ -4884,6 +4885,18 @@ export function createTempleSanctuary() {
 
       root.userData.scene02RuntimeContainer = scene02RuntimeContainerRoot.userData;
 
+      // SCENE02-RUNTIME-01 — first external Scene02 runtime module shell.
+      // This does not move visuals or switch rooms. It wraps the prepared Scene02 container.
+      const pathIntoUnknownSceneRuntime = createPathIntoUnknownSceneRuntime({
+        containerRoot: scene02RuntimeContainerRoot,
+        sourceSceneId: "scene01-sanctuary",
+        sceneId: "scene02-path-into-unknown",
+        title: "Path Into the Unknown",
+      });
+
+      root.userData.scene02RuntimeModule =
+        pathIntoUnknownSceneRuntime.getSnapshot();
+
       // SCENE02-BOOTSTRAP-07G — Container Binding Contract Only.
       // Creates a contract for future binding/reparenting, but does NOT bind or reparent now.
       const canPrepareScene02ContainerBindingContract =
@@ -5119,6 +5132,42 @@ export function createTempleSanctuary() {
         containerRoot: scene02RuntimeContainerRoot,
       });
 
+      // SCENE02-RUNTIME-01 — update external Scene02 runtime module shell.
+      // This mirrors current Scene02 state into a separate module without moving logic yet.
+      if (scene02ContainerActualBindingComplete) {
+        pathIntoUnknownSceneRuntime.markBoundLayers(
+          root.userData.scene02ContainerActualBinding?.boundLayerKeys ?? [
+            "scene02ShellRoot",
+            "scene02IsolationRoot",
+            "preScene02Root",
+          ]
+        );
+      }
+
+      root.userData.scene02RuntimeModule = pathIntoUnknownSceneRuntime.update({
+        active:
+          root.userData.currentLocalSceneId === "scene02-path-into-unknown" ||
+          scene02ContainerActualBindingComplete,
+        ready: scene02ContainerActualBindingComplete,
+        level: Math.max(
+          scene02ContainerActualBindingLevel,
+          scene02SemanticVisualPriorityLevel,
+          scene02RuntimeContainerLevel
+        ),
+        phase: scene02ContainerActualBindingComplete
+          ? "externalized-scene02-runtime-shell-ready"
+          : scene02RuntimeContainerPrepared
+            ? "externalized-scene02-runtime-shell-preparing"
+            : "not-ready",
+        currentLocalSceneId:
+          root.userData.currentLocalSceneId ?? "scene01-sanctuary",
+        previousLocalSceneId: root.userData.previousLocalSceneId ?? null,
+        containerPrepared: scene02RuntimeContainerPrepared,
+        containerBound: scene02ContainerActualBindingComplete,
+        visualResponseLevel: scene02SemanticVisualPriorityLevel,
+        actualBindingComplete: scene02ContainerActualBindingComplete,
+      });
+
       // Very restrained visual confirmation that Scene02 is now container-bound.
       if (scene02ContainerActualBindingComplete) {
         const boundPresence = THREE.MathUtils.smoothstep(
@@ -5308,6 +5357,12 @@ export function createTempleSanctuary() {
         scene02ContainerActualBindingLevel,
         scene02ContainerActualBindingPhase:
           root.userData.scene02ContainerActualBinding?.phase ?? "not-ready",
+        scene02RuntimeModuleReady:
+          root.userData.scene02RuntimeModule?.ready ?? false,
+        scene02RuntimeModulePhase:
+          root.userData.scene02RuntimeModule?.phase ?? "not-ready",
+        scene02RuntimeModuleReadyForExtraction:
+          root.userData.scene02RuntimeModule?.readyForFutureFullExtraction ?? false,
         hold: firstPassageHoldTime,
         readiness: transitionReadinessLevel,
         proximity: transitionZoneLevel,
@@ -5437,6 +5492,9 @@ export function createTempleSanctuary() {
         scene02ContainerActualBindingFailed: false,
         scene02ContainerActualBindingLevel: 0,
         scene02ContainerActualBindingPhase: "not-ready",
+        scene02RuntimeModuleReady: false,
+        scene02RuntimeModulePhase: "not-ready",
+        scene02RuntimeModuleReadyForExtraction: false,
         hold: 0,
         readiness: 0,
         proximity: 0,
@@ -5604,6 +5662,10 @@ export function createTempleSanctuary() {
         results: [],
         containerRoot: scene02RuntimeContainerRoot ?? null,
       });
+    },
+    getScene02RuntimeModule() {
+      return root.userData.scene02RuntimeModule ??
+        pathIntoUnknownSceneRuntime.getSnapshot();
     },
     getTransformationCueLevel() {
       return transformationCueLevel;
