@@ -497,7 +497,25 @@ export default function XRRootThree({ manifest, options, xrSupported, xrChecked,
     };
 
     const vrButton = VRButton.createButton(renderer, xrSessionInit);
-    vrButton.style.zIndex = "40";
+    Object.assign(vrButton.style, {
+      position: "absolute",
+      right: "14px",
+      bottom: "14px",
+      left: "auto",
+      top: "auto",
+      transform: "none",
+      zIndex: "40",
+      padding: "9px 10px",
+      borderRadius: "0",
+      border: "1px solid rgba(255,255,255,0.10)",
+      background: "rgba(4,6,10,0.18)",
+      color: "rgba(255,255,255,0.52)",
+      fontSize: "8px",
+      letterSpacing: "0.18em",
+      opacity: "0.74",
+      maxWidth: "190px",
+      whiteSpace: "nowrap",
+    });
     host.appendChild(vrButton);
 
     const onVRButtonClick = () => {
@@ -553,45 +571,45 @@ export default function XRRootThree({ manifest, options, xrSupported, xrChecked,
 
     const voiceBadge = document.createElement("div");
     voiceBadge.style.position = "absolute";
-    voiceBadge.style.right = "16px";
-    voiceBadge.style.top = "16px";
+    voiceBadge.style.right = "14px";
+    voiceBadge.style.top = "14px";
     voiceBadge.style.zIndex = "21";
-    voiceBadge.style.padding = "8px 10px";
-    voiceBadge.style.fontSize = "9px";
+    voiceBadge.style.padding = "7px 9px";
+    voiceBadge.style.fontSize = "8px";
     voiceBadge.style.letterSpacing = "0.16em";
     voiceBadge.style.textTransform = "uppercase";
-    voiceBadge.style.color = "rgba(255,255,255,0.76)";
-    voiceBadge.style.background = "rgba(8,12,20,0.30)";
-    voiceBadge.style.border = "1px solid rgba(255,255,255,0.10)";
+    voiceBadge.style.color = "rgba(255,255,255,0.48)";
+    voiceBadge.style.background = "rgba(8,12,20,0.14)";
+    voiceBadge.style.border = "1px solid rgba(255,255,255,0.075)";
     voiceBadge.style.backdropFilter = "blur(8px)";
     voiceBadge.style.webkitBackdropFilter = "blur(8px)";
     voiceBadge.style.userSelect = "none";
     voiceBadge.style.cursor = "pointer";
-    voiceBadge.textContent = "Voice · Off · V";
+    voiceBadge.textContent = "Voice · V";
     host.appendChild(voiceBadge);
 
     const updateVoiceBadge = (state) => {
       if (state?.error) {
-        voiceBadge.textContent = "Voice Seed · Error";
+        voiceBadge.textContent = "Voice · Err";
         return;
       }
 
       if (!state?.enabled) {
-        voiceBadge.textContent = "Voice Seed · Off · press V";
+        voiceBadge.textContent = "Voice · Off";
         return;
       }
 
       if (state?.calibrating) {
-        voiceBadge.textContent = "Voice Seed · Calibrating";
+        voiceBadge.textContent = "Voice · Cal";
         return;
       }
 
       if (state?.active) {
-        voiceBadge.textContent = "Voice Seed · Listening";
+        voiceBadge.textContent = "Voice · On";
         return;
       }
 
-      voiceBadge.textContent = "Voice Seed · Enabled";
+      voiceBadge.textContent = "Voice · On";
     };
 
     const enableSound = async () => {
@@ -671,18 +689,18 @@ export default function XRRootThree({ manifest, options, xrSupported, xrChecked,
       Object.assign(desktopAttunementHint.style, {
         position: "fixed",
         left: "50%",
-        bottom: "92px",
+        bottom: "128px",
         transform: "translateX(-50%)",
         zIndex: "45",
-        padding: "9px 13px",
-        border: "1px solid rgba(180, 205, 255, 0.26)",
+        padding: "7px 10px",
+        border: "1px solid rgba(180, 205, 255, 0.18)",
         borderRadius: "999px",
-        background: "rgba(4, 8, 16, 0.62)",
-        color: "rgba(225, 236, 255, 0.86)",
+        background: "rgba(4, 8, 16, 0.38)",
+        color: "rgba(225, 236, 255, 0.72)",
         fontFamily:
           "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-        fontSize: "10px",
-        letterSpacing: "0.16em",
+        fontSize: "8px",
+        letterSpacing: "0.14em",
         textTransform: "uppercase",
         pointerEvents: "none",
         opacity: "0",
@@ -715,7 +733,7 @@ export default function XRRootThree({ manifest, options, xrSupported, xrChecked,
       if (desktopAttunementState.isHolding) {
         desktopAttunementHint.textContent = `ATTUNING ${Math.round(value * 100)}%`;
       } else {
-        desktopAttunementHint.textContent = "HOLD E TO ATTUNE";
+        desktopAttunementHint.textContent = "HOLD E";
       }
     };
 
@@ -1620,7 +1638,7 @@ let latestVoiceState = {
         pid: boundRoom.label ?? nearest.room.label,
         caption: boundRoom.caption ?? nearest.room.caption,
         visible: true,
-        hintOpacity: 0.86,
+        hintOpacity: 0.42,
       });
       interaction.setMeterProgress(progress);
 

@@ -355,17 +355,17 @@ export default function XRExperienceHost({
             position: "absolute",
             left: 14,
             bottom: 14,
-            padding: "10px 12px",
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(0,0,0,0.28)",
-            color: "rgba(255,255,255,0.62)",
+            padding: "8px 10px",
+            border: "1px solid rgba(255,255,255,0.075)",
+            background: "rgba(0,0,0,0.16)",
+            color: "rgba(255,255,255,0.38)",
             letterSpacing: "0.22em",
             textTransform: "uppercase",
-            fontSize: 10,
+            fontSize: 8,
             pointerEvents: "none",
           }}
         >
-          Desktop preview
+          Desktop
         </div>
       ) : null}
 
@@ -379,13 +379,13 @@ export default function XRExperienceHost({
           position:absolute;
           right:14px;
           bottom:14px;
-          padding:12px 14px;
-          border:1px solid rgba(255,255,255,0.18) !important;
-          background:rgba(0,0,0,0.35) !important;
-          color:rgba(255,255,255,0.88) !important;
+          padding:10px 12px;
+          border:1px solid rgba(255,255,255,0.12) !important;
+          background:rgba(0,0,0,0.22) !important;
+          color:rgba(255,255,255,0.72) !important;
           letter-spacing:0.26em;
           text-transform:uppercase;
-          font-size:11px;
+          font-size:9px;
           border-radius:0;
         }
       `}</style>
