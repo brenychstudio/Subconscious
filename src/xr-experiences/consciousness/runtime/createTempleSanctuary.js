@@ -2062,6 +2062,13 @@ export function createTempleSanctuary() {
   let scene02ContainerBindingPreflightHoldTime = 0;
   let scene02ContainerBindingPreflightReady = false;
   let scene02ContainerBindingPreflightLevel = 0;
+  let scene02ContainerActualBindingHoldTime = 0;
+  let scene02ContainerActualBindingRequested = false;
+  let scene02ContainerActualBindingComplete = false;
+  let scene02ContainerActualBindingFailed = false;
+  let scene02ContainerActualBindingLevel = 0;
+
+  const scene02OriginalParents = new Map();
 
   // SCENE02-BOOTSTRAP-02 - minimal local scene-state registry.
   // This is intentionally local to Scene 01 runtime for now.
@@ -2737,7 +2744,147 @@ export function createTempleSanctuary() {
 
       nextStep: ready
         ? "Ready for 07I: single-layer binding dry run or clone-binding test."
-        : "Waiting for binding contract/container readiness before any binding attempt.",
+      : "Waiting for binding contract/container readiness before any binding attempt.",
+    };
+  }
+
+  // SCENE02-BOOTSTRAP-08A — Controlled Container Binding helpers.
+  // Actual binding, but controlled: preserves world transform and runs once.
+  function createScene02BindingRuntimeSnapshot(object) {
+    if (!object) {
+      return {
+        exists: false,
+        name: null,
+        parentName: null,
+        uuid: null,
+      };
+    }
+
+    const worldPosition = new THREE.Vector3();
+    const worldQuaternion = new THREE.Quaternion();
+    const worldScale = new THREE.Vector3();
+
+    object.updateWorldMatrix?.(true, false);
+    object.matrixWorld?.decompose(worldPosition, worldQuaternion, worldScale);
+
+    return {
+      exists: true,
+      name: object.name ?? null,
+      uuid: object.uuid ?? null,
+      parentName: object.parent?.name ?? null,
+      visible: Boolean(object.visible),
+      childCount: object.children?.length ?? 0,
+      worldPosition: [
+        roundScene02PreflightNumber(worldPosition.x),
+        roundScene02PreflightNumber(worldPosition.y),
+        roundScene02PreflightNumber(worldPosition.z),
+      ],
+      worldScale: [
+        roundScene02PreflightNumber(worldScale.x),
+        roundScene02PreflightNumber(worldScale.y),
+        roundScene02PreflightNumber(worldScale.z),
+      ],
+    };
+  }
+
+  function bindScene02LayerToContainerPreserveWorld({
+    key,
+    object,
+    container,
+  }) {
+    if (!object || !container) {
+      return {
+        key,
+        ok: false,
+        reason: "missing-object-or-container",
+        objectName: object?.name ?? null,
+        containerName: container?.name ?? null,
+      };
+    }
+
+    if (object === container) {
+      return {
+        key,
+        ok: false,
+        reason: "cannot-bind-container-to-itself",
+        objectName: object.name,
+        containerName: container.name,
+      };
+    }
+
+    if (object.parent === container) {
+      return {
+        key,
+        ok: true,
+        alreadyBound: true,
+        objectName: object.name,
+        containerName: container.name,
+        parentName: object.parent?.name ?? null,
+      };
+    }
+
+    if (!scene02OriginalParents.has(key)) {
+      scene02OriginalParents.set(key, {
+        parent: object.parent ?? null,
+        parentName: object.parent?.name ?? null,
+        snapshotBeforeBinding: createScene02BindingRuntimeSnapshot(object),
+      });
+    }
+
+    container.updateWorldMatrix?.(true, false);
+    object.updateWorldMatrix?.(true, false);
+
+    container.attach(object);
+
+    object.updateWorldMatrix?.(true, true);
+
+    return {
+      key,
+      ok: object.parent === container,
+      alreadyBound: false,
+      objectName: object.name ?? null,
+      containerName: container.name ?? null,
+      parentName: object.parent?.name ?? null,
+      snapshotAfterBinding: createScene02BindingRuntimeSnapshot(object),
+    };
+  }
+
+  function createScene02ActualBindingState({
+    requested = false,
+    complete = false,
+    failed = false,
+    level = 0,
+    phase = "not-ready",
+    results = [],
+    containerRoot = null,
+  }) {
+    return {
+      version: "scene02-container-actual-binding-v0.1",
+      requested,
+      complete,
+      failed,
+      level,
+      phase,
+      containerName: containerRoot?.name ?? "PathIntoUnknownRuntimeContainer",
+      boundLayerKeys: results.filter((item) => item.ok).map((item) => item.key),
+      results,
+      originalParents: Array.from(scene02OriginalParents.entries()).map(
+        ([key, value]) => ({
+          key,
+          parentName: value.parentName,
+          snapshotBeforeBinding: value.snapshotBeforeBinding,
+        })
+      ),
+      safety: {
+        actualBinding: true,
+        preservesWorldTransform: true,
+        reparentsOnlyScene02Layers: true,
+        movesCameraNow: false,
+        performsTeleportNow: false,
+        performsRoomSwitchNow: false,
+        touchesSkyNow: false,
+        touchesXRRootNow: false,
+      },
     };
   }
 
@@ -2794,6 +2941,16 @@ export function createTempleSanctuary() {
         firstPassageRoot,
         passageRoot,
       },
+    });
+  root.userData.scene02ContainerActualBinding =
+    createScene02ActualBindingState({
+      requested: false,
+      complete: false,
+      failed: false,
+      level: 0,
+      phase: "not-ready",
+      results: [],
+      containerRoot: scene02RuntimeContainerRoot ?? null,
     });
 
   const chamberWorldPosition = new THREE.Vector3();
@@ -4842,6 +4999,157 @@ export function createTempleSanctuary() {
       root.userData.scene02ContainerBindingPreflight =
         scene02ContainerBindingPreflight;
 
+      // SCENE02-BOOTSTRAP-08A — Controlled Container Binding.
+      // This is the first actual controlled binding step.
+      // It reparents only Scene02 visual layers into the Scene02 container.
+      // No teleport, no camera move, no XRRoot, no sky changes.
+      const canRunScene02ActualContainerBinding =
+        scene02ContainerBindingPreflightReady &&
+        scene02ContainerBindingPreflightLevel > 0.72 &&
+        Boolean(
+          root.userData.scene02ContainerBindingPreflight?.canAttemptFutureBinding
+        ) &&
+        scene02RuntimeContainerPrepared &&
+        root.userData.currentLocalSceneId === "scene02-path-into-unknown";
+
+      if (
+        canRunScene02ActualContainerBinding &&
+        !scene02ContainerActualBindingRequested &&
+        !scene02ContainerActualBindingComplete &&
+        !scene02ContainerActualBindingFailed
+      ) {
+        scene02ContainerActualBindingHoldTime += deltaSeconds;
+
+        if (scene02ContainerActualBindingHoldTime > 0.45) {
+          scene02ContainerActualBindingRequested = true;
+        }
+      } else if (
+        !scene02ContainerActualBindingRequested &&
+        !scene02ContainerActualBindingComplete
+      ) {
+        scene02ContainerActualBindingHoldTime = Math.max(
+          0,
+          scene02ContainerActualBindingHoldTime - deltaSeconds * 0.75
+        );
+      }
+
+      let scene02ActualBindingResults =
+        root.userData.scene02ContainerActualBinding?.results ?? [];
+
+      if (
+        scene02ContainerActualBindingRequested &&
+        !scene02ContainerActualBindingComplete &&
+        !scene02ContainerActualBindingFailed
+      ) {
+        try {
+          scene02ActualBindingResults = [
+            bindScene02LayerToContainerPreserveWorld({
+              key: "scene02ShellRoot",
+              object: scene02ShellRoot,
+              container: scene02RuntimeContainerRoot,
+            }),
+            bindScene02LayerToContainerPreserveWorld({
+              key: "scene02IsolationRoot",
+              object: scene02IsolationRoot,
+              container: scene02RuntimeContainerRoot,
+            }),
+            bindScene02LayerToContainerPreserveWorld({
+              key: "preScene02Root",
+              object: preScene02Root,
+              container: scene02RuntimeContainerRoot,
+            }),
+          ];
+
+          const allRequiredBindingsOk = scene02ActualBindingResults.every(
+            (result) => result.ok
+          );
+
+          scene02ContainerActualBindingComplete = allRequiredBindingsOk;
+          scene02ContainerActualBindingFailed = !allRequiredBindingsOk;
+        } catch (error) {
+          scene02ContainerActualBindingFailed = true;
+          scene02ActualBindingResults = [
+            {
+              key: "binding-exception",
+              ok: false,
+              reason: error?.message ?? "unknown-binding-error",
+            },
+          ];
+        }
+      }
+
+      const scene02ActualBindingTarget = scene02ContainerActualBindingComplete
+        ? 1
+        : scene02ContainerActualBindingRequested
+          ? 0.55
+          : 0;
+
+      scene02ContainerActualBindingLevel = THREE.MathUtils.lerp(
+        scene02ContainerActualBindingLevel,
+        scene02ActualBindingTarget,
+        0.04
+      );
+
+      if (scene02ContainerActualBindingComplete) {
+        scene02RuntimeContainerRoot.visible = true;
+        scene02RuntimeContainerRoot.userData.currentChildrenBound = true;
+        scene02RuntimeContainerRoot.userData.existingVisualLayersStillInPlace = false;
+        scene02RuntimeContainerRoot.userData.boundLayerKeys = [
+          "scene02ShellRoot",
+          "scene02IsolationRoot",
+          "preScene02Root",
+        ];
+      }
+
+      root.userData.scene02ContainerActualBinding = createScene02ActualBindingState({
+        requested: scene02ContainerActualBindingRequested,
+        complete: scene02ContainerActualBindingComplete,
+        failed: scene02ContainerActualBindingFailed,
+        level: scene02ContainerActualBindingLevel,
+        phase: scene02ContainerActualBindingFailed
+          ? "actual-binding-failed"
+          : scene02ContainerActualBindingComplete
+            ? "actual-binding-complete"
+            : scene02ContainerActualBindingRequested
+              ? "actual-binding-requested"
+              : canRunScene02ActualContainerBinding
+                ? "actual-binding-preparing"
+                : "not-ready",
+        results: scene02ActualBindingResults,
+        containerRoot: scene02RuntimeContainerRoot,
+      });
+
+      // Very restrained visual confirmation that Scene02 is now container-bound.
+      if (scene02ContainerActualBindingComplete) {
+        const boundPresence = THREE.MathUtils.smoothstep(
+          scene02ContainerActualBindingLevel,
+          0.04,
+          1.0
+        );
+        const boundBreath = 0.5 + 0.5 * Math.sin(t * 0.18);
+
+        scene02StreamMaterial.opacity +=
+          boundPresence * THREE.MathUtils.lerp(0.06, 0.18, boundBreath);
+
+        scene02IsolationStreamMaterial.opacity +=
+          boundPresence * THREE.MathUtils.lerp(0.04, 0.14, boundBreath);
+
+        scene02GuideLight.intensity +=
+          boundPresence * THREE.MathUtils.lerp(0.08, 0.28, boundBreath);
+
+        scene02IsolationLight.intensity +=
+          boundPresence * THREE.MathUtils.lerp(0.06, 0.22, boundBreath);
+
+        // Old prompt becomes less important after actual binding.
+        if (passagePromptRoot?.visible) {
+          passagePromptSprite.material.opacity *= THREE.MathUtils.lerp(
+            1.0,
+            0.18,
+            boundPresence
+          );
+        }
+      }
+
       // SCENE02-BOOTSTRAP-02 - derive minimal scene02 state.
       // Still no navigation, no teleport, no room switch.
       const scene01TransitionPhase =
@@ -4994,6 +5302,12 @@ export function createTempleSanctuary() {
           root.userData.scene02ContainerBindingPreflight?.phase ?? "not-ready",
         scene02ContainerBindingCanAttemptFutureBinding:
           root.userData.scene02ContainerBindingPreflight?.canAttemptFutureBinding ?? false,
+        scene02ContainerActualBindingRequested,
+        scene02ContainerActualBindingComplete,
+        scene02ContainerActualBindingFailed,
+        scene02ContainerActualBindingLevel,
+        scene02ContainerActualBindingPhase:
+          root.userData.scene02ContainerActualBinding?.phase ?? "not-ready",
         hold: firstPassageHoldTime,
         readiness: transitionReadinessLevel,
         proximity: transitionZoneLevel,
@@ -5118,6 +5432,11 @@ export function createTempleSanctuary() {
         scene02ContainerBindingPreflightLevel: 0,
         scene02ContainerBindingPreflightPhase: "not-ready",
         scene02ContainerBindingCanAttemptFutureBinding: false,
+        scene02ContainerActualBindingRequested: false,
+        scene02ContainerActualBindingComplete: false,
+        scene02ContainerActualBindingFailed: false,
+        scene02ContainerActualBindingLevel: 0,
+        scene02ContainerActualBindingPhase: "not-ready",
         hold: 0,
         readiness: 0,
         proximity: 0,
@@ -5273,6 +5592,17 @@ export function createTempleSanctuary() {
           firstPassageRoot,
           passageRoot,
         },
+      });
+    },
+    getScene02ContainerActualBinding() {
+      return root.userData.scene02ContainerActualBinding ?? createScene02ActualBindingState({
+        requested: false,
+        complete: false,
+        failed: false,
+        level: 0,
+        phase: "not-ready",
+        results: [],
+        containerRoot: scene02RuntimeContainerRoot ?? null,
       });
     },
     getTransformationCueLevel() {
