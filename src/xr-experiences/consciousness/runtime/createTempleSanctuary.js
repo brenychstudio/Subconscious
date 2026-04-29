@@ -516,6 +516,265 @@ export function createTempleSanctuary() {
   rearGlow.position.set(0, preset.altar.height + 1.0, -0.52);
   decorRoot.add(rearGlow);
 
+  const firstFramePreset = preset.firstFrameComposition ?? {};
+  const firstFrameRoot = new THREE.Group();
+  firstFrameRoot.name = "TempleSanctuaryFirstFrameComposition";
+  firstFrameRoot.position.set(
+    0,
+    preset.altar.height + (firstFramePreset.y ?? 1.18),
+    firstFramePreset.z ?? -0.72
+  );
+  altarRoot.add(firstFrameRoot);
+
+  const firstFrameBackVeil = new THREE.Mesh(
+    new THREE.CircleGeometry(firstFramePreset.backVeilRadius ?? 2.88, 96),
+    makeAxialGlowMaterial({
+      color: firstFramePreset.accentColor ?? "#86a8ff",
+      opacity: 0,
+    })
+  );
+  firstFrameBackVeil.name = "TempleSanctuaryFirstFrameBackVeil";
+  firstFrameBackVeil.position.z = -0.035;
+  firstFrameRoot.add(firstFrameBackVeil);
+
+  const firstFrameOuterHalo = new THREE.Mesh(
+    new THREE.RingGeometry(
+      Math.max(0.01, (firstFramePreset.haloRadius ?? 2.62) - 0.018),
+      firstFramePreset.haloRadius ?? 2.62,
+      160
+    ),
+    makeAxialGlowMaterial({
+      color: firstFramePreset.color ?? "#dce8ff",
+      opacity: 0,
+    })
+  );
+  firstFrameOuterHalo.name = "TempleSanctuaryFirstFrameOuterHalo";
+  firstFrameOuterHalo.position.z = -0.012;
+  firstFrameRoot.add(firstFrameOuterHalo);
+
+  const firstFrameInnerHalo = new THREE.Mesh(
+    new THREE.RingGeometry(
+      Math.max(0.01, (firstFramePreset.innerHaloRadius ?? 1.56) - 0.014),
+      firstFramePreset.innerHaloRadius ?? 1.56,
+      144
+    ),
+    makeAxialGlowMaterial({
+      color: firstFramePreset.color ?? "#dce8ff",
+      opacity: 0,
+    })
+  );
+  firstFrameInnerHalo.name = "TempleSanctuaryFirstFrameInnerHalo";
+  firstFrameInnerHalo.position.z = -0.004;
+  firstFrameRoot.add(firstFrameInnerHalo);
+
+  const firstFrameVerticalSeams = new THREE.Group();
+  firstFrameVerticalSeams.name = "TempleSanctuaryFirstFrameVerticalSeams";
+  firstFrameRoot.add(firstFrameVerticalSeams);
+
+  const firstFrameSeamMaterial = makeAxialGlowMaterial({
+    color: firstFramePreset.accentColor ?? "#86a8ff",
+    opacity: 0,
+  });
+
+  [-1.72, 1.72].forEach((x) => {
+    const seam = new THREE.Mesh(
+      new THREE.BoxGeometry(0.026, 2.8, 0.01),
+      firstFrameSeamMaterial
+    );
+    seam.name =
+      x < 0
+        ? "TempleSanctuaryFirstFrameLeftSeam"
+        : "TempleSanctuaryFirstFrameRightSeam";
+    seam.position.set(x, 0.05, 0.012);
+    firstFrameVerticalSeams.add(seam);
+  });
+
+  const firstFrameAisleRoot = new THREE.Group();
+  firstFrameAisleRoot.name = "TempleSanctuaryFirstFrameAisleLines";
+  firstFrameAisleRoot.position.set(0, 0.032, 8.4);
+  firstFrameRoot.add(firstFrameAisleRoot);
+
+  const firstFrameAisleMaterial = makeAxialGlowMaterial({
+    color: firstFramePreset.color ?? "#dce8ff",
+    opacity: 0,
+  });
+
+  [
+    { x: 0, width: 0.022, length: 11.8, opacityScale: 1 },
+    { x: -0.58, width: 0.014, length: 9.8, opacityScale: 0.58 },
+    { x: 0.58, width: 0.014, length: 9.8, opacityScale: 0.58 },
+  ].forEach((lineSpec, index) => {
+    const line = new THREE.Mesh(
+      new THREE.BoxGeometry(lineSpec.width, 0.006, lineSpec.length),
+      index === 0 ? firstFrameAisleMaterial : firstFrameAisleMaterial.clone()
+    );
+    line.name = `TempleSanctuaryFirstFrameAisleLine_${index}`;
+    line.position.set(lineSpec.x, 0, 0);
+    line.userData.opacityScale = lineSpec.opacityScale;
+    firstFrameAisleRoot.add(line);
+  });
+
+  const firstFrameKeyLight = new THREE.PointLight(
+    new THREE.Color(firstFramePreset.color ?? "#dce8ff"),
+    0,
+    18,
+    2
+  );
+  firstFrameKeyLight.name = "TempleSanctuaryFirstFrameKeyLight";
+  firstFrameKeyLight.position.set(0, preset.altar.height + 1.65, 3.2);
+  firstFrameRoot.add(firstFrameKeyLight);
+
+  const firstFrameRimLight = new THREE.PointLight(
+    new THREE.Color(firstFramePreset.accentColor ?? "#86a8ff"),
+    0,
+    20,
+    2
+  );
+  firstFrameRimLight.name = "TempleSanctuaryFirstFrameRimLight";
+  firstFrameRimLight.position.set(-2.8, preset.altar.height + 1.7, 2.4);
+  firstFrameRoot.add(firstFrameRimLight);
+
+  const activationPeakPreset = preset.activationPeak ?? {};
+  const activationPeakRoot = new THREE.Group();
+  activationPeakRoot.name = "TempleSanctuaryActivationPeakRoot";
+  activationPeakRoot.position.set(
+    0,
+    activationPeakPreset.coreY ?? 1.06,
+    activationPeakPreset.z ?? -0.02
+  );
+  activationPeakRoot.visible = false;
+  chamberAnchor.add(activationPeakRoot);
+
+  const activationOuterRing = new THREE.Mesh(
+    new THREE.TorusGeometry(
+      activationPeakPreset.crownRadius ?? 1.72,
+      activationPeakPreset.crownTube ?? 0.012,
+      10,
+      160
+    ),
+    makeAxialGlowMaterial({
+      color: activationPeakPreset.color ?? "#eef4ff",
+      opacity: 0,
+    })
+  );
+  activationOuterRing.name = "TempleSanctuaryActivationOuterRing";
+  activationPeakRoot.add(activationOuterRing);
+
+  const activationInnerRing = new THREE.Mesh(
+    new THREE.TorusGeometry(
+      activationPeakPreset.innerCrownRadius ?? 1.05,
+      (activationPeakPreset.crownTube ?? 0.012) * 0.78,
+      10,
+      144
+    ),
+    makeAxialGlowMaterial({
+      color: activationPeakPreset.accentColor ?? "#9fbaff",
+      opacity: 0,
+    })
+  );
+  activationInnerRing.name = "TempleSanctuaryActivationInnerRing";
+  activationPeakRoot.add(activationInnerRing);
+
+  const activationBeam = new THREE.Mesh(
+    new THREE.CylinderGeometry(
+      activationPeakPreset.verticalBeamRadius ?? 0.032,
+      activationPeakPreset.verticalBeamRadius ?? 0.032,
+      activationPeakPreset.verticalBeamHeight ?? 3.75,
+      24,
+      1,
+      true
+    ),
+    makeAxialGlowMaterial({
+      color: activationPeakPreset.color ?? "#eef4ff",
+      opacity: 0,
+    })
+  );
+  activationBeam.name = "TempleSanctuaryActivationVerticalBeam";
+  activationPeakRoot.add(activationBeam);
+
+  const activationShockwave = new THREE.Mesh(
+    new THREE.RingGeometry(
+      Math.max(0.01, (activationPeakPreset.shockwaveRadius ?? 2.65) - 0.09),
+      activationPeakPreset.shockwaveRadius ?? 2.65,
+      160
+    ),
+    makeAxialGlowMaterial({
+      color: activationPeakPreset.accentColor ?? "#9fbaff",
+      opacity: 0,
+    })
+  );
+  activationShockwave.name = "TempleSanctuaryActivationShockwave";
+  activationShockwave.rotation.x = -Math.PI / 2;
+  activationShockwave.position.set(0, preset.altar.height + 0.016, 0);
+  activationShockwave.visible = false;
+  decorRoot.add(activationShockwave);
+
+  const activationSparkCount = activationPeakPreset.sparkCount ?? 168;
+  const activationSparkPositions = new Float32Array(activationSparkCount * 3);
+  const activationSparkBasePositions = new Float32Array(activationSparkCount * 3);
+  const activationSparkDirections = new Float32Array(activationSparkCount * 3);
+  const activationSparkPhases = new Float32Array(activationSparkCount);
+
+  for (let i = 0; i < activationSparkCount; i += 1) {
+    const theta = Math.random() * Math.PI * 2;
+    const v = Math.random() * 2 - 1;
+    const phi = Math.acos(v);
+
+    const radius = THREE.MathUtils.lerp(
+      activationPeakPreset.sparkRadiusMin ?? 0.42,
+      activationPeakPreset.sparkRadiusMax ?? 1.12,
+      Math.random()
+    );
+
+    const dx = Math.sin(phi) * Math.cos(theta);
+    const dy = Math.cos(phi);
+    const dz = Math.sin(phi) * Math.sin(theta);
+
+    const i3 = i * 3;
+
+    activationSparkDirections[i3 + 0] = dx;
+    activationSparkDirections[i3 + 1] = dy;
+    activationSparkDirections[i3 + 2] = dz;
+
+    activationSparkBasePositions[i3 + 0] = dx * radius;
+    activationSparkBasePositions[i3 + 1] = dy * radius * 0.72;
+    activationSparkBasePositions[i3 + 2] = dz * radius;
+
+    activationSparkPositions[i3 + 0] = activationSparkBasePositions[i3 + 0];
+    activationSparkPositions[i3 + 1] = activationSparkBasePositions[i3 + 1];
+    activationSparkPositions[i3 + 2] = activationSparkBasePositions[i3 + 2];
+
+    activationSparkPhases[i] = Math.random() * Math.PI * 2;
+  }
+
+  const activationSparkGeometry = new THREE.BufferGeometry();
+  activationSparkGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(activationSparkPositions, 3)
+  );
+
+  const activationSparkMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.002 : 0,
+    color: new THREE.Color(activationPeakPreset.color ?? "#eef4ff"),
+    size: activationPeakPreset.sparkSize ?? 0.025,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    toneMapped: false,
+  });
+
+  const activationSparks = new THREE.Points(
+    activationSparkGeometry,
+    activationSparkMaterial
+  );
+  activationSparks.name = "TempleSanctuaryActivationSparks";
+  activationSparks.visible = false;
+  activationPeakRoot.add(activationSparks);
+
   const thresholdReveal = preset.thresholdReveal ?? {};
   const thresholdRoot = new THREE.Group();
   thresholdRoot.name = "TempleSanctuaryThresholdReveal";
@@ -2332,6 +2591,8 @@ export function createTempleSanctuary() {
   let transformationCueTriggered = false;
   let transformationCueLevel = 0;
   let openingStateLevel = 0;
+  let activationPeakAge = 999;
+  let activationPeakLevel = 0;
   let transitionReadinessLevel = 0;
   let transitionZoneLevel = 0;
   let firstPassageHoldTime = 0;
@@ -2769,8 +3030,17 @@ export function createTempleSanctuary() {
       const transformationCue = preset.transformationCue ?? {};
       const transformationCueEnabled = transformationCue.enabled !== false;
 
-      if (transformationCueEnabled && ritualChargeComplete) {
+      if (
+        transformationCueEnabled &&
+        ritualChargeComplete &&
+        !transformationCueTriggered
+      ) {
         transformationCueTriggered = true;
+        activationPeakAge = 0;
+      }
+
+      if (activationPeakAge < 999) {
+        activationPeakAge += deltaSeconds;
       }
 
       const transformationTarget =
@@ -2790,6 +3060,37 @@ export function createTempleSanctuary() {
         openingStateEnabled && transformationCueTriggered ? 1 : 0,
         openingState.smoothing ?? 0.028
       );
+
+      const activationPeak = preset.activationPeak ?? {};
+      const activationPeakEnabled = activationPeak.enabled !== false;
+      const activationChargeAmount = activationPeakEnabled
+        ? THREE.MathUtils.smoothstep(
+            ritualChargeLevel,
+            activationPeak.chargeStart ?? 0.18,
+            activationPeak.chargeEnd ?? 0.96
+          )
+        : 0;
+      const activationPeakFlashAmount = activationPeakEnabled
+        ? Math.exp(-activationPeakAge * (activationPeak.flashDecay ?? 1.62))
+        : 0;
+      const activationPeakTarget = activationPeakEnabled
+        ? THREE.MathUtils.clamp(
+            activationChargeAmount * 0.62 + activationPeakFlashAmount,
+            0,
+            1
+          )
+        : 0;
+
+      activationPeakLevel = THREE.MathUtils.lerp(
+        activationPeakLevel,
+        activationPeakTarget,
+        activationPeak.smoothing ?? 0.13
+      );
+
+      const activationPeakBreath =
+        0.5 + 0.5 * Math.sin(t * (activationPeak.pulseSpeed ?? 2.2));
+      const activationPeakLightAmount =
+        activationPeakLevel * (0.72 + activationPeakBreath * 0.28);
 
       const chargeInfluence =
         ritualChargeLevel *
@@ -2847,6 +3148,36 @@ export function createTempleSanctuary() {
       const thresholdEnabled = threshold.enabled !== false;
       const thresholdAmount = thresholdEnabled ? transformationCueLevel : 0;
       const lightDirection = preset.lightDirection ?? {};
+      const firstFrame = preset.firstFrameComposition ?? {};
+      const firstFrameEnabled = firstFrame.enabled !== false;
+      const firstFrameProximityFade =
+        1 -
+        THREE.MathUtils.smoothstep(
+          proximityLevel,
+          firstFrame.fadeAtProximityStart ?? 0.2,
+          firstFrame.fadeAtProximityEnd ?? 0.78
+        );
+      const firstFrameOpeningFade =
+        1 -
+        THREE.MathUtils.clamp(
+          openingStateLevel * (firstFrame.openingFade ?? 0.72),
+          0,
+          1
+        );
+      const firstFrameAmount = firstFrameEnabled
+        ? THREE.MathUtils.clamp(
+            firstFrameProximityFade * firstFrameOpeningFade,
+            0,
+            1
+          )
+        : 0;
+      const firstFrameBreath =
+        0.5 + 0.5 * Math.sin(t * (firstFrame.breathSpeed ?? 0.34));
+      const firstFramePulse = THREE.MathUtils.lerp(
+        0.78,
+        1.08,
+        firstFrameBreath
+      );
       const centralBreathSpeed =
         lightDirection.centralLightBreathSpeed ?? atmospherePreset.chamberBreathSpeed ?? 0.72;
       const centralBreath = 0.5 + 0.5 * Math.sin(t * centralBreathSpeed);
@@ -2868,13 +3199,17 @@ export function createTempleSanctuary() {
         transformationCueLevel * 0.58 +
         openingStateLevel * (atmospherePreset.chamberAmbientLift ?? 0.085) +
         openingStateLevel * (atmospherePreset.portalAreaLift ?? 0.11) * 0.5 +
-        thresholdAmount * (atmospherePreset.thresholdLightBoost ?? 0.18);
+        thresholdAmount * (atmospherePreset.thresholdLightBoost ?? 0.18) +
+        activationPeakLightAmount * (activationPeak.lightBoost ?? 0.78) +
+        activationPeakFlashAmount * (activationPeak.flashLightBoost ?? 1.82) +
+        firstFrameAmount * (firstFrame.chamberLightBoost ?? 0.48) * firstFramePulse;
 
       chamberFillLight.intensity =
         centralBaseLight *
         0.12 *
         readabilityBoost *
-        (0.92 + openingStateLevel * 0.08);
+        (0.92 + openingStateLevel * 0.08) +
+        firstFrameAmount * (firstFrame.fillLightBoost ?? 0.08) * firstFramePulse;
       chamberFillTarget.position.set(
         0,
         preset.altar.height + 1.0 + openingStateLevel * 0.06,
@@ -2887,20 +3222,175 @@ export function createTempleSanctuary() {
         (0.78 + centralBreath * 0.22);
       portalBacklight.position.z = -2.4 - thresholdAmount * 0.12;
 
+      portalBacklight.intensity +=
+        activationPeakFlashAmount * (activationPeak.portalKick ?? 0.36);
+
+      activationPeakRoot.visible = activationPeakLevel > 0.012;
+      activationShockwave.visible = activationPeakLevel > 0.012;
+
+      if (activationPeakRoot.visible) {
+        activationPeakRoot.rotation.z +=
+          deltaSeconds * (0.014 + activationPeakLevel * 0.035);
+        activationOuterRing.rotation.z +=
+          deltaSeconds * (0.08 + activationPeakLevel * 0.22);
+        activationInnerRing.rotation.z -=
+          deltaSeconds * (0.12 + activationPeakLevel * 0.34);
+
+        const activationScale =
+          1 +
+          activationChargeAmount * 0.025 +
+          activationPeakFlashAmount * 0.22 +
+          activationPeakBreath * 0.012;
+
+        activationOuterRing.scale.setScalar(activationScale);
+        activationInnerRing.scale.setScalar(
+          1 + activationChargeAmount * 0.018 + activationPeakFlashAmount * 0.16
+        );
+        activationBeam.scale.setScalar(1 + activationPeakFlashAmount * 0.18);
+      }
+
+      activationOuterRing.material.opacity =
+        activationChargeAmount * (activationPeak.chargeRingOpacity ?? 0.115) +
+        activationPeakFlashAmount * (activationPeak.flashRingOpacity ?? 0.26);
+
+      activationInnerRing.material.opacity =
+        activationChargeAmount * (activationPeak.innerRingOpacity ?? 0.085) +
+        activationPeakFlashAmount * (activationPeak.flashRingOpacity ?? 0.26) * 0.72;
+
+      activationBeam.material.opacity =
+        activationChargeAmount * (activationPeak.beamOpacity ?? 0.068) +
+        activationPeakFlashAmount * (activationPeak.flashBeamOpacity ?? 0.16);
+
+      activationShockwave.material.opacity =
+        activationPeakLevel * (activationPeak.shockwaveOpacity ?? 0.13) +
+        activationPeakFlashAmount * (activationPeak.flashShockwaveOpacity ?? 0.24);
+      activationShockwave.scale.setScalar(
+        1 + activationPeakFlashAmount * 0.34 + activationPeakBreath * 0.025
+      );
+
+      activationSparks.visible = activationPeakLevel > 0.02;
+      activationSparkMaterial.opacity =
+        activationPeakLevel *
+        (activationPeak.sparkOpacity ?? 0.44) *
+        (0.55 + activationPeakFlashAmount * 0.45);
+
+      if (activationSparks.visible) {
+        const activationSparkAttr =
+          activationSparkGeometry.getAttribute("position");
+        const activationExpansion =
+          activationPeakFlashAmount * (activationPeak.sparkExpansion ?? 1.95) +
+          activationChargeAmount * 0.22;
+        const activationLift =
+          activationPeakFlashAmount * (activationPeak.sparkLift ?? 0.34);
+
+        for (let i = 0; i < activationSparkCount; i += 1) {
+          const i3 = i * 3;
+          const phase = activationSparkPhases[i];
+          const swirl =
+            Math.sin(t * 1.18 + phase) *
+            (0.018 + activationPeakLevel * 0.035);
+
+          activationSparkPositions[i3 + 0] =
+            activationSparkBasePositions[i3 + 0] +
+            activationSparkDirections[i3 + 0] * activationExpansion +
+            Math.cos(t * 0.82 + phase) * swirl;
+
+          activationSparkPositions[i3 + 1] =
+            activationSparkBasePositions[i3 + 1] +
+            activationSparkDirections[i3 + 1] * activationExpansion * 0.72 +
+            activationLift +
+            Math.sin(t * 0.96 + phase) * swirl * 0.76;
+
+          activationSparkPositions[i3 + 2] =
+            activationSparkBasePositions[i3 + 2] +
+            activationSparkDirections[i3 + 2] * activationExpansion +
+            Math.sin(t * 0.68 + phase) * swirl;
+        }
+
+        activationSparkAttr.needsUpdate = true;
+        activationSparks.rotation.y +=
+          deltaSeconds * (0.04 + activationPeakLevel * 0.08);
+      }
+
+      if (typeof firstFrameRoot !== "undefined" && firstFrameRoot) {
+        firstFrameRoot.visible = firstFrameAmount > 0.01;
+
+        if (firstFrameRoot.visible) {
+          firstFrameRoot.scale.setScalar(1 + firstFrameBreath * 0.018);
+          firstFrameRoot.rotation.z +=
+            deltaSeconds * (firstFrame.haloRotation ?? 0.006);
+        }
+
+        firstFrameBackVeil.material.opacity = THREE.MathUtils.lerp(
+          firstFrameBackVeil.material.opacity,
+          firstFrameAmount * (firstFrame.backVeilOpacity ?? 0.026),
+          0.055
+        );
+        firstFrameOuterHalo.material.opacity = THREE.MathUtils.lerp(
+          firstFrameOuterHalo.material.opacity,
+          firstFrameAmount * (firstFrame.haloOpacity ?? 0.112),
+          0.055
+        );
+        firstFrameInnerHalo.material.opacity = THREE.MathUtils.lerp(
+          firstFrameInnerHalo.material.opacity,
+          firstFrameAmount * (firstFrame.innerHaloOpacity ?? 0.058),
+          0.055
+        );
+        firstFrameSeamMaterial.opacity = THREE.MathUtils.lerp(
+          firstFrameSeamMaterial.opacity,
+          firstFrameAmount * (firstFrame.verticalSeamOpacity ?? 0.046),
+          0.055
+        );
+
+        firstFrameAisleRoot.children.forEach((line) => {
+          line.material.opacity = THREE.MathUtils.lerp(
+            line.material.opacity,
+            firstFrameAmount *
+              (firstFrame.aisleOpacity ?? 0.036) *
+              (line.userData.opacityScale ?? 1) *
+              (0.72 + firstFrameBreath * 0.28),
+            0.055
+          );
+        });
+
+        firstFrameKeyLight.intensity = THREE.MathUtils.lerp(
+          firstFrameKeyLight.intensity,
+          firstFrameAmount *
+            (firstFrame.keyLightIntensity ?? 0.72) *
+            (0.86 + firstFrameBreath * 0.14),
+          0.055
+        );
+        firstFrameRimLight.intensity = THREE.MathUtils.lerp(
+          firstFrameRimLight.intensity,
+          firstFrameAmount *
+            (firstFrame.rimLightIntensity ?? 0.42) *
+            (0.82 + firstFrameBreath * 0.18),
+          0.055
+        );
+      }
+
       const cueWave = 0.72 + Math.max(0, pulseWave) * 0.28;
 
       callRing.material.opacity =
         Math.max(0, preset.callLight.ringOpacity) +
         transformationCueLevel *
           (transformationCue.callRingOpacity ?? 0.13) *
-          cueWave;
+          cueWave +
+        activationPeakLevel *
+          (activationPeak.callRingKick ?? 0.14) *
+          (0.78 + activationPeakBreath * 0.22) +
+        activationPeakFlashAmount * (activationPeak.flashRingOpacity ?? 0.26) * 0.62;
 
       rearGlow.material.opacity =
         Math.max(
           preset.callLight.rearGlowOpacity,
           thresholdAmount * (lightDirection.floorBounceOpacity ?? 0.032)
         ) +
-        transformationCueLevel * (transformationCue.rearGlowOpacity ?? 0.11) * cueWave;
+        transformationCueLevel * (transformationCue.rearGlowOpacity ?? 0.11) * cueWave +
+        activationPeakLevel *
+          (activationPeak.rearGlowKick ?? 0.16) *
+          (0.78 + activationPeakBreath * 0.22) +
+        activationPeakFlashAmount * 0.12;
 
       thresholdRoot.visible = thresholdAmount > 0.012;
 
@@ -5450,6 +5940,7 @@ export function createTempleSanctuary() {
         handAttunementLevel * (preset.attunement?.soundBoost ?? 0.75),
         chargeInfluence * (preset.ritualCharge?.soundBoost ?? 0.95),
         transformationCueLevel * (preset.transformationCue?.soundBoost ?? 1.15),
+        activationPeakLevel * (preset.activationPeak?.soundBoost ?? 0.42),
         openingStateLevel * (preset.openingState?.soundFloor ?? 0.85)
       );
     },
@@ -5689,6 +6180,8 @@ export function createTempleSanctuary() {
       transformationCueTriggered = false;
       transformationCueLevel = 0;
       openingStateLevel = 0;
+      activationPeakAge = 999;
+      activationPeakLevel = 0;
     },
     dispose() {
       softPointTexture?.dispose?.();

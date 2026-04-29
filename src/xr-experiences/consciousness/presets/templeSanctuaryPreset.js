@@ -1,7 +1,7 @@
 export const templeSanctuaryPreset = {
   userSpawn: {
-    position: { x: 0, y: 1.6, z: 24.5 },
-    lookAt: { x: 0, y: 1.18, z: 0.08 },
+    position: { x: 0, y: 1.6, z: 20.6 },
+    lookAt: { x: 0, y: 1.22, z: -0.12 },
   },
 
   altar: {
@@ -12,12 +12,45 @@ export const templeSanctuaryPreset = {
   chamber: {
     position: { x: 0, y: 0, z: 0 },
     offsetY: 0.78,
-    scale: 1.04,
+    scale: 1.12,
     spinSpeed: 0.072,
-    lightIntensity: 2.32,
+    lightIntensity: 2.58,
     lightDistance: 36,
     auraOpacity: 0.0,
     auraRadius: 2.15,
+  },
+
+  firstFrameComposition: {
+    enabled: true,
+
+    // DEMO-REAL-01A — arrival composition lock.
+    // Local authored visual support only: no sky, no XRRoot, no transition-state changes.
+    y: 1.18,
+    z: -0.72,
+
+    haloRadius: 2.62,
+    innerHaloRadius: 1.56,
+    backVeilRadius: 2.88,
+
+    haloOpacity: 0.112,
+    innerHaloOpacity: 0.058,
+    backVeilOpacity: 0.026,
+    verticalSeamOpacity: 0.046,
+    aisleOpacity: 0.036,
+
+    breathSpeed: 0.34,
+    haloRotation: 0.006,
+    fadeAtProximityStart: 0.2,
+    fadeAtProximityEnd: 0.78,
+    openingFade: 0.72,
+
+    chamberLightBoost: 0.48,
+    fillLightBoost: 0.08,
+    keyLightIntensity: 0.72,
+    rimLightIntensity: 0.42,
+
+    color: "#dce8ff",
+    accentColor: "#86a8ff",
   },
 
   atmosphere: {
@@ -32,7 +65,7 @@ export const templeSanctuaryPreset = {
       yMin: -0.15,
       yMax: 1.85,
       size: 0.022,
-      opacity: 0.18,
+      opacity: 0.145,
       drift: 0.22,
       spin: 0.0009,
       verticalAmplitude: 0.018,
@@ -46,7 +79,7 @@ export const templeSanctuaryPreset = {
       yMin: -0.25,
       yMax: 2.8,
       size: 0.03,
-      opacity: 0.12,
+      opacity: 0.092,
       drift: 0.15,
       spin: 0.00045,
       verticalAmplitude: 0.026,
@@ -60,7 +93,7 @@ export const templeSanctuaryPreset = {
       yMin: -0.4,
       yMax: 4.4,
       size: 0.04,
-      opacity: 0.08,
+      opacity: 0.058,
       drift: 0.08,
       spin: 0.00018,
       verticalAmplitude: 0.035,
@@ -75,7 +108,7 @@ export const templeSanctuaryPreset = {
       yMin: 0.15,
       yMax: 2.05,
       size: 0.019,
-      opacity: 0.07,
+      opacity: 0.052,
       drift: 0.12,
       spin: 0.00035,
       verticalAmplitude: 0.02,
@@ -199,6 +232,58 @@ export const templeSanctuaryPreset = {
     rearGlowOpacity: 0.18,
 
     holdAfterComplete: true,
+  },
+
+  activationPeak: {
+    enabled: true,
+
+    // DEMO-REAL-01B — Chamber Activation Peak Pass.
+    // Local authored visual boost for Hold E -> THRESHOLD OPEN.
+    // No sky, no XRRoot, no Scene02 orchestration changes.
+    chargeStart: 0.18,
+    chargeEnd: 0.96,
+
+    smoothing: 0.13,
+    flashDecay: 1.62,
+    pulseSpeed: 2.2,
+
+    coreY: 1.06,
+    z: -0.02,
+
+    crownRadius: 1.72,
+    innerCrownRadius: 1.05,
+    crownTube: 0.012,
+
+    chargeRingOpacity: 0.115,
+    innerRingOpacity: 0.085,
+    flashRingOpacity: 0.26,
+
+    verticalBeamHeight: 3.75,
+    verticalBeamRadius: 0.032,
+    beamOpacity: 0.068,
+    flashBeamOpacity: 0.16,
+
+    shockwaveRadius: 2.65,
+    shockwaveOpacity: 0.13,
+    flashShockwaveOpacity: 0.24,
+
+    sparkCount: 168,
+    sparkSize: 0.025,
+    sparkOpacity: 0.44,
+    sparkRadiusMin: 0.42,
+    sparkRadiusMax: 1.12,
+    sparkExpansion: 1.95,
+    sparkLift: 0.34,
+
+    lightBoost: 0.78,
+    flashLightBoost: 1.82,
+    portalKick: 0.36,
+    rearGlowKick: 0.16,
+    callRingKick: 0.14,
+    soundBoost: 0.42,
+
+    color: "#eef4ff",
+    accentColor: "#9fbaff",
   },
 
   thresholdReveal: {
@@ -371,7 +456,7 @@ export const templeSanctuaryPreset = {
     coreColor: "#040914",
   },
 
-  processionalRows: {
+    processionalRows: {
     leftX: -6.35,
     rightX: 6.35,
     zStart: 10.4,
@@ -381,10 +466,10 @@ export const templeSanctuaryPreset = {
     depth: 0.52,
     baseHeight: 11.2,
     heightFalloff: 0.92,
-    opacity: 0.135,
+      opacity: 0.105,
   },
 
-  sideSentinels: {
+    sideSentinels: {
     enabled: true,
     positions: [
       { x: -12.4, z: 7.2, h: 8.2 },
@@ -394,10 +479,10 @@ export const templeSanctuaryPreset = {
     ],
     width: 0.44,
     depth: 0.44,
-    opacity: 0.07,
+      opacity: 0.052,
   },
 
-  rearGate: {
+    rearGate: {
     z: -7.6,
     width: 6.25,
     height: 8.35,
@@ -406,12 +491,12 @@ export const templeSanctuaryPreset = {
     lintelHeight: 0.34,
     innerWidth: 3.9,
     innerHeight: 6.25,
-    opacity: 0.145,
+      opacity: 0.118,
   },
 
-  floorRings: {
+    floorRings: {
     radii: [2.2, 4.45, 7.15],
-    opacity: 0.075,
+      opacity: 0.058,
   },
 
   callLight: {
