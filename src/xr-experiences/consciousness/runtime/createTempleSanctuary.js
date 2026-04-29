@@ -1748,6 +1748,135 @@ export function createTempleSanctuary() {
   scene02GuideLight.position.set(0, 0, -2.2);
   scene02ShellRoot.add(scene02GuideLight);
 
+  // SCENE02-BOOTSTRAP-03 - Scene02 Visual Isolation Layer.
+  // This starts separating Scene 02 as its own visual state.
+  // No teleport, no room switch, no sky/global runtime changes.
+  const scene02IsolationRoot = new THREE.Group();
+  scene02IsolationRoot.name = "PathIntoUnknownVisualIsolationLayer";
+  scene02IsolationRoot.visible = false;
+  scene02IsolationRoot.position.set(0, 0, -1.72);
+  transitionPortalRoot.add(scene02IsolationRoot);
+
+  const scene02IsolationVeilMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#02060d"),
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    side: THREE.DoubleSide,
+    blending: THREE.NormalBlending,
+    toneMapped: false,
+  });
+
+  const scene02IsolationVeil = new THREE.Mesh(
+    new THREE.CircleGeometry(1.42, 128),
+    scene02IsolationVeilMaterial
+  );
+  scene02IsolationVeil.name = "PathIntoUnknownIsolationVeil";
+  scene02IsolationVeil.position.z = -0.84;
+  scene02IsolationVeil.renderOrder = 136;
+  scene02IsolationRoot.add(scene02IsolationVeil);
+
+  const scene02IsolationRings = [];
+  const scene02IsolationRingSpecs = [
+    { radius: 0.62, z: -0.46, tube: 0.0032, opacity: 0.12, speed: 0.078 },
+    { radius: 1.04, z: -1.14, tube: 0.0028, opacity: 0.082, speed: -0.054 },
+    { radius: 1.56, z: -2.08, tube: 0.0024, opacity: 0.052, speed: 0.034 },
+    { radius: 2.16, z: -3.26, tube: 0.002, opacity: 0.032, speed: -0.022 },
+  ];
+
+  scene02IsolationRingSpecs.forEach((spec, index) => {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(spec.radius, spec.tube, 8, 144),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(index < 1 ? "#eaf3ff" : "#769fff"),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    );
+
+    ring.name = `PathIntoUnknownIsolationRing_${index}`;
+    ring.position.z = spec.z;
+    ring.renderOrder = 138 + index;
+    scene02IsolationRoot.add(ring);
+
+    scene02IsolationRings.push({ ring, ...spec });
+  });
+
+  const scene02IsolationStreamCount = 260;
+  const scene02IsolationStreamPositions = new Float32Array(scene02IsolationStreamCount * 3);
+  const scene02IsolationStreamBasePositions = new Float32Array(scene02IsolationStreamCount * 3);
+  const scene02IsolationStreamPhases = new Float32Array(scene02IsolationStreamCount);
+  const scene02IsolationStreamSeeds = new Float32Array(scene02IsolationStreamCount);
+
+  for (let i = 0; i < scene02IsolationStreamCount; i += 1) {
+    const i3 = i * 3;
+    const lane = Math.random();
+    const angle = Math.random() * Math.PI * 2;
+
+    const z = THREE.MathUtils.lerp(0.18, -4.8, lane);
+    const radius =
+      THREE.MathUtils.lerp(1.64, 0.04, lane) * (0.28 + Math.random() * 0.92);
+
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius * 0.68;
+
+    scene02IsolationStreamBasePositions[i3 + 0] = x;
+    scene02IsolationStreamBasePositions[i3 + 1] = y;
+    scene02IsolationStreamBasePositions[i3 + 2] = z;
+
+    scene02IsolationStreamPositions[i3 + 0] = x;
+    scene02IsolationStreamPositions[i3 + 1] = y;
+    scene02IsolationStreamPositions[i3 + 2] = z;
+
+    scene02IsolationStreamPhases[i] = Math.random() * Math.PI * 2;
+    scene02IsolationStreamSeeds[i] = lane;
+  }
+
+  const scene02IsolationStreamGeometry = new THREE.BufferGeometry();
+  scene02IsolationStreamGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(scene02IsolationStreamPositions, 3)
+  );
+
+  const scene02IsolationStreamMaterial = new THREE.PointsMaterial({
+    map: softPointTexture,
+    alphaMap: softPointTexture,
+    alphaTest: softPointTexture ? 0.001 : 0,
+    color: new THREE.Color("#eef6ff"),
+    size: 0.052,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    toneMapped: false,
+  });
+
+  const scene02IsolationStreams = new THREE.Points(
+    scene02IsolationStreamGeometry,
+    scene02IsolationStreamMaterial
+  );
+  scene02IsolationStreams.name = "PathIntoUnknownIsolationStreams";
+  scene02IsolationStreams.visible = false;
+  scene02IsolationStreams.renderOrder = 144;
+  scene02IsolationRoot.add(scene02IsolationStreams);
+
+  const scene02IsolationLight = new THREE.PointLight(
+    new THREE.Color("#dceaff"),
+    0,
+    8.8,
+    1.5
+  );
+  scene02IsolationLight.name = "PathIntoUnknownIsolationLight";
+  scene02IsolationLight.position.set(0, 0.02, -1.8);
+  scene02IsolationRoot.add(scene02IsolationLight);
+
   // SCENE01-PORTAL-09D.2 - small luminous ticks make ring rotation readable.
   // Full circles rotate invisibly, so these restrained markers reveal mechanism motion.
   const transitionPortalMechanismMarkers = new THREE.Group();
@@ -1880,6 +2009,282 @@ export function createTempleSanctuary() {
   let scene02ShellHoldTime = 0;
   let scene02ShellActivated = false;
   let scene02ShellLevel = 0;
+  let scene02VisualIsolationHoldTime = 0;
+  let scene02VisualIsolationTriggered = false;
+  let scene02VisualIsolationLevel = 0;
+  let scene01SoftFadeLevel = 0;
+  let scene02SwitchContractHoldTime = 0;
+  let scene02SwitchContractReady = false;
+  let scene02SwitchContractLevel = 0;
+  let scene02RuntimeSwitchStubHoldTime = 0;
+  let scene02RuntimeSwitchStubArmed = false;
+  let scene02RuntimeSwitchStubLevel = 0;
+
+  // SCENE02-BOOTSTRAP-02 - minimal local scene-state registry.
+  // This is intentionally local to Scene 01 runtime for now.
+  // No room switch, no teleport, no XRRoot changes.
+  const localSceneStateRegistry = {
+    scene01: {
+      id: "scene01-sanctuary",
+      title: "Sanctuary / Membrane Chamber",
+      status: "active",
+      phase: "arrival",
+      level: 1,
+      supportFadeLevel: 0,
+      isCurrent: true,
+      isComplete: false,
+    },
+
+    scene02: {
+      id: "scene02-path-into-unknown",
+      title: "Path Into the Unknown",
+      status: "dormant",
+      phase: "locked",
+      shellActivated: false,
+      shellLevel: 0,
+      visualIsolationTriggered: false,
+      visualIsolationLevel: 0,
+      handoffReady: false,
+      switchContractReady: false,
+      switchContractLevel: 0,
+      switchContract: null,
+      runtimeSwitchStubArmed: false,
+      runtimeSwitchStubLevel: 0,
+      runtimeSwitchStub: null,
+      isCurrent: false,
+      isComplete: false,
+    },
+  };
+
+  function updateLocalSceneStateRegistry({
+    scene01Phase,
+    scene01Complete = false,
+    scene01SupportFadeValue = 0,
+    scene02Status,
+    scene02Phase,
+    scene02ShellActive,
+    scene02ShellValue,
+    scene02VisualIsolationActive = false,
+    scene02VisualIsolationValue = 0,
+    scene02HandoffReady,
+    scene02SwitchContractReadyValue = false,
+    scene02SwitchContractLevelValue = 0,
+    scene02SwitchContract = null,
+    scene02RuntimeSwitchStubArmedValue = false,
+    scene02RuntimeSwitchStubLevelValue = 0,
+    scene02RuntimeSwitchStub = null,
+  }) {
+  localSceneStateRegistry.scene01.phase = scene01Phase;
+  localSceneStateRegistry.scene01.isComplete = scene01Complete;
+  localSceneStateRegistry.scene01.supportFadeLevel = scene01SupportFadeValue;
+  localSceneStateRegistry.scene01.status = scene01Complete
+    ? "handoff-ready"
+    : "active";
+    localSceneStateRegistry.scene01.isCurrent = !scene02HandoffReady;
+
+    localSceneStateRegistry.scene02.status = scene02Status;
+    localSceneStateRegistry.scene02.phase = scene02Phase;
+    localSceneStateRegistry.scene02.shellActivated = scene02ShellActive;
+    localSceneStateRegistry.scene02.shellLevel = scene02ShellValue;
+    localSceneStateRegistry.scene02.visualIsolationTriggered = scene02VisualIsolationActive;
+    localSceneStateRegistry.scene02.visualIsolationLevel = scene02VisualIsolationValue;
+    localSceneStateRegistry.scene02.handoffReady = scene02HandoffReady;
+    localSceneStateRegistry.scene02.switchContractReady = scene02SwitchContractReadyValue;
+    localSceneStateRegistry.scene02.switchContractLevel = scene02SwitchContractLevelValue;
+    localSceneStateRegistry.scene02.switchContract = scene02SwitchContract;
+    localSceneStateRegistry.scene02.runtimeSwitchStubArmed = scene02RuntimeSwitchStubArmedValue;
+    localSceneStateRegistry.scene02.runtimeSwitchStubLevel = scene02RuntimeSwitchStubLevelValue;
+    localSceneStateRegistry.scene02.runtimeSwitchStub = scene02RuntimeSwitchStub;
+    localSceneStateRegistry.scene02.isCurrent = scene02HandoffReady;
+  }
+
+  root.userData.sceneRegistry = localSceneStateRegistry;
+  root.userData.scene02 = localSceneStateRegistry.scene02;
+
+  function createScene02SwitchContract({
+    ready = false,
+    level = 0,
+    phase = "locked",
+    proximity = 0,
+    scene02ShellValue = 0,
+    scene02VisualIsolationValue = 0,
+  }) {
+    return {
+      version: "scene02-switch-contract-v0.1",
+
+      ready,
+      level,
+      phase,
+
+      sourceSceneId: "scene01-sanctuary",
+      sourceTitle: "Sanctuary / Membrane Chamber",
+
+      targetSceneId: "scene02-path-into-unknown",
+      targetTitle: "Path Into the Unknown",
+
+      transitionType: "soft-passage",
+      switchMode: "future-runtime-switch",
+      entryAnchor: "path-threshold-forward",
+      entryDirection: "forward-through-portal",
+
+      requirements: {
+        thresholdOpen: true,
+        firstPassageTriggered: true,
+        enterReady: true,
+        preScene02HandoffTriggered: true,
+        scene02ShellActivated: true,
+        scene02VisualIsolationTriggered: true,
+        viewerInTransitionZone: proximity > 0.72,
+      },
+
+      runtime: {
+        scene02ShellLevel: scene02ShellValue,
+        scene02VisualIsolationLevel: scene02VisualIsolationValue,
+        proximity,
+      },
+
+      nextStep: ready
+        ? "Scene02 runtime switch can be implemented by a future handoff adapter."
+        : "Scene02 visual shell is preparing; runtime switch is not ready yet.",
+
+      performsNavigationNow: false,
+      performsTeleportNow: false,
+      touchesSkyNow: false,
+    };
+  }
+
+  root.userData.scene02SwitchContract = createScene02SwitchContract({
+    ready: false,
+    level: 0,
+    phase: "not-ready",
+    proximity: 0,
+    scene02ShellValue: 0,
+    scene02VisualIsolationValue: 0,
+  });
+
+  function createScene02RuntimeSwitchStub({
+    armed = false,
+    level = 0,
+    phase = "not-ready",
+    proximity = 0,
+    switchContract = null,
+  }) {
+    const contractReady = Boolean(switchContract?.ready);
+
+    return {
+      version: "scene02-runtime-switch-stub-v0.1",
+
+      armed,
+      level,
+      phase,
+
+      sourceSceneId: "scene01-sanctuary",
+      targetSceneId: "scene02-path-into-unknown",
+
+      switchMode: "stub-only",
+      transitionType: "soft-passage",
+      entryAnchor: "path-threshold-forward",
+      entryDirection: "forward-through-portal",
+
+      contractReady,
+      canBeImplementedByFutureAdapter:
+        armed && contractReady && proximity > 0.72,
+
+      futureAdapterContract: {
+        shouldFadeScene01: true,
+        shouldKeepSkyLayerAlive: true,
+        shouldPreserveUserForwardDirection: true,
+        shouldEnterScene02AtAnchor: "path-threshold-forward",
+        shouldUseSoftPassageTransition: true,
+      },
+
+      runtime: {
+        proximity,
+        switchContractLevel: switchContract?.level ?? 0,
+        switchContractPhase: switchContract?.phase ?? "not-ready",
+      },
+
+      performsNavigationNow: false,
+      performsTeleportNow: false,
+      performsRoomSwitchNow: false,
+      touchesSkyNow: false,
+
+      nextStep: armed
+        ? "Safe runtime switch stub is armed. Future adapter can implement actual Scene02 switch."
+        : "Runtime switch stub is waiting for Scene02 switch contract readiness.",
+    };
+  }
+
+  // SCENE02-BOOTSTRAP-07A — Runtime Switch Diagnostic Marker Only.
+  // Diagnostic only: no adapter, no room switch, no teleport, no visual changes.
+  function createScene02RuntimeDiagnostic({
+    transitionState = null,
+    switchContract = null,
+    runtimeSwitchStub = null,
+    proximity = 0,
+  }) {
+    const contractReady = Boolean(switchContract?.ready);
+    const stubArmed = Boolean(runtimeSwitchStub?.armed);
+    const stubLevel = runtimeSwitchStub?.level ?? 0;
+
+    return {
+      version: "scene02-runtime-diagnostic-v0.1",
+
+      reachedSwitchContract: contractReady,
+      reachedRuntimeSwitchStub: stubArmed,
+      stubLevel,
+      proximity,
+
+      phase: stubArmed
+        ? "runtime-switch-stub-armed"
+        : contractReady
+          ? "switch-contract-ready"
+          : transitionState?.phase ?? "not-ready",
+
+      safeForFutureAdapter:
+        contractReady && stubArmed && stubLevel > 0.72 && proximity > 0.68,
+
+      confirms: {
+        noNavigation: true,
+        noTeleport: true,
+        noRoomSwitch: true,
+        noSkyMutation: true,
+        noXRRootMutation: true,
+        diagnosticOnly: true,
+      },
+
+      observedTransition: {
+        scene02ShellActivated: Boolean(transitionState?.scene02ShellActivated),
+        scene02ShellReady: Boolean(transitionState?.scene02ShellReady),
+        scene02VisualIsolationReady: Boolean(
+          transitionState?.scene02VisualIsolationReady
+        ),
+        scene02SwitchContractReady: Boolean(
+          transitionState?.scene02SwitchContractReady
+        ),
+        scene02RuntimeSwitchStubArmed: stubArmed,
+        phase: transitionState?.phase ?? "unknown",
+      },
+
+      nextStep: contractReady && stubArmed
+        ? "Ready for 07B: adapter object only, without registry mutation."
+        : "Continue validating pre-adapter state before adding adapter logic.",
+    };
+  }
+
+  root.userData.scene02RuntimeSwitch = createScene02RuntimeSwitchStub({
+    armed: false,
+    level: 0,
+    phase: "not-ready",
+    proximity: 0,
+    switchContract: null,
+  });
+  root.userData.scene02RuntimeDiagnostic = createScene02RuntimeDiagnostic({
+    transitionState: root.userData.scene01Transition ?? null,
+    switchContract: root.userData.scene02SwitchContract ?? null,
+    runtimeSwitchStub: root.userData.scene02RuntimeSwitch ?? null,
+    proximity: 0,
+  });
 
   const chamberWorldPosition = new THREE.Vector3();
   const cameraWorldPosition = new THREE.Vector3();
@@ -1903,6 +2308,13 @@ export function createTempleSanctuary() {
     scene02ShellLevel: 0,
     scene02ShellHold: 0,
     scene02ShellReady: false,
+    scene02HandoffReady: false,
+    scene02SwitchContractReady: false,
+    scene02SwitchContractLevel: 0,
+    scene02SwitchContractPhase: "not-ready",
+    scene02RuntimeSwitchStubArmed: false,
+    scene02RuntimeSwitchStubLevel: 0,
+    scene02RuntimeSwitchStubPhase: "not-ready",
     hold: 0,
     readiness: 0,
     proximity: 0,
@@ -3127,6 +3539,419 @@ export function createTempleSanctuary() {
           scene02ShellLevel * THREE.MathUtils.lerp(0.18, 0.48, scene02Breath);
       }
 
+      // SCENE02-BOOTSTRAP-03 - visual isolation readiness.
+      // Still no navigation, no teleport, no room switch.
+      const scene02ShellReady = scene02ShellLevel > 0.82;
+
+      const canStartScene02VisualIsolation =
+        scene02ShellActivated &&
+        scene02ShellReady &&
+        preScene02HandoffLevel > 0.74 &&
+        transitionZoneLevel > 0.74;
+
+      if (canStartScene02VisualIsolation && !scene02VisualIsolationTriggered) {
+        scene02VisualIsolationHoldTime += deltaSeconds;
+
+        if (scene02VisualIsolationHoldTime > 0.9) {
+          scene02VisualIsolationTriggered = true;
+        }
+      } else if (!scene02VisualIsolationTriggered) {
+        scene02VisualIsolationHoldTime = Math.max(
+          0,
+          scene02VisualIsolationHoldTime - deltaSeconds * 0.8
+        );
+      }
+
+      const scene02VisualIsolationTarget = scene02VisualIsolationTriggered ? 1 : 0;
+
+      scene02VisualIsolationLevel = THREE.MathUtils.lerp(
+        scene02VisualIsolationLevel,
+        scene02VisualIsolationTarget,
+        0.032
+      );
+
+      const scene02IsolationBreath = 0.5 + 0.5 * Math.sin(t * 0.24);
+      const scene02IsolationPulse = THREE.MathUtils.lerp(
+        0.78,
+        1.2,
+        scene02IsolationBreath
+      );
+
+      scene02IsolationRoot.visible = scene02VisualIsolationLevel > 0.01;
+
+      if (scene02IsolationRoot.visible) {
+        scene02IsolationRoot.scale.setScalar(
+          THREE.MathUtils.lerp(0.92, 1.22, scene02VisualIsolationLevel)
+        );
+
+        scene02IsolationRoot.rotation.z -=
+          deltaSeconds * 0.012 * scene02VisualIsolationLevel;
+
+        scene02IsolationVeilMaterial.opacity =
+          scene02VisualIsolationLevel *
+          THREE.MathUtils.lerp(0.12, 0.28, scene02IsolationBreath);
+
+        scene02IsolationVeil.scale.setScalar(
+          THREE.MathUtils.lerp(0.92, 1.18, scene02VisualIsolationLevel) *
+            THREE.MathUtils.lerp(0.96, 1.04, scene02IsolationBreath)
+        );
+
+        scene02IsolationRings.forEach((entry, index) => {
+          entry.ring.visible = true;
+          entry.ring.rotation.z +=
+            deltaSeconds * entry.speed * scene02VisualIsolationLevel;
+
+          const ringBreath =
+            1 +
+            Math.sin(t * 0.22 + index * 1.18) * 0.028 * scene02VisualIsolationLevel;
+
+          entry.ring.scale.setScalar(ringBreath);
+
+          entry.ring.material.opacity =
+            scene02VisualIsolationLevel *
+            entry.opacity *
+            scene02IsolationPulse *
+            (index === 0 ? 1.28 : 1);
+        });
+
+        scene02IsolationStreams.visible = scene02VisualIsolationLevel > 0.024;
+        scene02IsolationStreamMaterial.opacity =
+          scene02VisualIsolationLevel *
+          THREE.MathUtils.lerp(0.18, 0.72, scene02IsolationBreath);
+
+        if (scene02IsolationStreams.visible) {
+          const isoAttr = scene02IsolationStreamGeometry.getAttribute("position");
+
+          for (let i = 0; i < scene02IsolationStreamCount; i += 1) {
+            const i3 = i * 3;
+            const phase = scene02IsolationStreamPhases[i];
+            const lane = scene02IsolationStreamSeeds[i];
+
+            const baseX = scene02IsolationStreamBasePositions[i3 + 0];
+            const baseY = scene02IsolationStreamBasePositions[i3 + 1];
+            const baseZ = scene02IsolationStreamBasePositions[i3 + 2];
+
+            const travel = (t * 0.2 + phase * 0.019 + lane) % 1;
+            const compression = THREE.MathUtils.lerp(
+              1.0,
+              0.06,
+              travel * scene02VisualIsolationLevel
+            );
+
+            const depthPull = travel * 3.7 * scene02VisualIsolationLevel;
+            const spiral = t * 0.48 + phase;
+
+            const swirlX = Math.sin(spiral) * 0.052 * scene02VisualIsolationLevel;
+            const swirlY = Math.cos(spiral * 0.78) * 0.042 * scene02VisualIsolationLevel;
+
+            scene02IsolationStreamPositions[i3 + 0] = baseX * compression + swirlX;
+            scene02IsolationStreamPositions[i3 + 1] = baseY * compression + swirlY;
+            scene02IsolationStreamPositions[i3 + 2] = baseZ - depthPull;
+          }
+
+          isoAttr.needsUpdate = true;
+
+          scene02IsolationStreams.rotation.z -=
+            deltaSeconds * 0.07 * scene02VisualIsolationLevel;
+
+          scene02IsolationStreams.rotation.y +=
+            deltaSeconds * 0.026 * scene02VisualIsolationLevel;
+        }
+
+        scene02IsolationLight.intensity =
+          scene02VisualIsolationLevel *
+          THREE.MathUtils.lerp(0.22, 0.92, scene02IsolationBreath);
+
+        scene02IsolationLight.distance =
+          THREE.MathUtils.lerp(4.6, 8.8, scene02VisualIsolationLevel);
+
+        // Scene 01 support elements become secondary, not removed.
+        passagePromptSprite.material.opacity *= THREE.MathUtils.lerp(
+          1,
+          0.28,
+          scene02VisualIsolationLevel
+        );
+
+        transitionReadinessRing.material.opacity *= THREE.MathUtils.lerp(
+          1,
+          0.52,
+          scene02VisualIsolationLevel
+        );
+
+        transitionReadinessInnerRing.material.opacity *= THREE.MathUtils.lerp(
+          1,
+          0.52,
+          scene02VisualIsolationLevel
+        );
+
+        // Scene 02 layers gain priority.
+        scene02StreamMaterial.opacity += scene02VisualIsolationLevel * 0.16;
+        preScene02StreamMaterial.opacity += scene02VisualIsolationLevel * 0.12;
+        firstPassageStreakMaterial.opacity += scene02VisualIsolationLevel * 0.1;
+
+        scene02GuideLight.intensity +=
+          scene02VisualIsolationLevel *
+          THREE.MathUtils.lerp(0.12, 0.36, scene02IsolationBreath);
+      }
+
+      const scene02HandoffReady =
+        scene02ShellActivated &&
+        scene02ShellReady &&
+        scene02VisualIsolationLevel > 0.76 &&
+        transitionZoneLevel > 0.72;
+
+      // SCENE02-BOOTSTRAP-04 - Soft Scene01 Fade Support.
+      // Scene 01 does not disappear. It becomes quieter while Scene 02 takes focus.
+      const scene01SoftFadeTarget =
+        scene02VisualIsolationLevel > 0.32 || scene02HandoffReady ? 1 : 0;
+
+      scene01SoftFadeLevel = THREE.MathUtils.lerp(
+        scene01SoftFadeLevel,
+        scene01SoftFadeTarget,
+        0.026
+      );
+
+      const scene01FadePresence = THREE.MathUtils.smoothstep(
+        scene01SoftFadeLevel,
+        0.04,
+        1.0
+      );
+
+      const scene01SupportDim = THREE.MathUtils.lerp(1.0, 0.34, scene01FadePresence);
+      const scene01PromptDim = THREE.MathUtils.lerp(1.0, 0.24, scene01FadePresence);
+      const scene01ParticleDim = THREE.MathUtils.lerp(1.0, 0.42, scene01FadePresence);
+
+      // Floor/readiness layer becomes secondary.
+      if (transitionReadinessRoot?.visible) {
+        transitionReadinessRing.material.opacity *= scene01SupportDim;
+        transitionReadinessInnerRing.material.opacity *= scene01SupportDim;
+
+        transitionReadinessNeedles.children.forEach((needle) => {
+          needle.material.opacity *= scene01SupportDim;
+        });
+
+        transitionReadinessGlow.intensity *= scene01SupportDim;
+      }
+
+      // Prompt remains useful, but becomes less dominant once Scene 02 takes visual priority.
+      if (passagePromptRoot?.visible) {
+        passagePromptSprite.material.opacity *= scene01PromptDim;
+
+        passagePromptNeedles.children.forEach((needle) => {
+          needle.material.opacity *= scene01PromptDim;
+        });
+
+        passagePromptLight.intensity *= scene01PromptDim;
+      }
+
+      // Older Scene01 release/support particles become quieter.
+      // We do not hide them abruptly; this prevents a hard visual pop.
+      if (chamberReleaseParticles?.visible) {
+        chamberReleaseMaterial.opacity *= scene01ParticleDim;
+      }
+
+      if (chamberDissolvePoints?.visible) {
+        dissolveMaterial.opacity *= scene01ParticleDim;
+      }
+
+      if (transitionPortalMechanismMarkers?.visible) {
+        transitionPortalMechanismMarkers.children.forEach((marker) => {
+          marker.material.opacity *= THREE.MathUtils.lerp(1.0, 0.72, scene01FadePresence);
+        });
+      }
+
+      // Keep portal mechanism alive, but let the Scene02 tunnel become the primary visual.
+      transitionPortalRing.material.opacity *= THREE.MathUtils.lerp(
+        1.0,
+        0.82,
+        scene01FadePresence
+      );
+
+      transitionPortalInnerRing.material.opacity *= THREE.MathUtils.lerp(
+        1.0,
+        0.78,
+        scene01FadePresence
+      );
+
+      // Reinforce Scene02 visual layers while Scene01 support fades.
+      if (scene02VisualIsolationLevel > 0.01) {
+        scene02IsolationStreamMaterial.opacity += scene01FadePresence * 0.08;
+        scene02StreamMaterial.opacity += scene01FadePresence * 0.08;
+        preScene02StreamMaterial.opacity += scene01FadePresence * 0.06;
+
+        scene02IsolationLight.intensity += scene01FadePresence * 0.18;
+        scene02GuideLight.intensity += scene01FadePresence * 0.18;
+        preScene02GuideLight.intensity += scene01FadePresence * 0.1;
+      }
+
+      // SCENE02-BOOTSTRAP-05 - Handoff State Marker + Future Switch Contract.
+      // This creates an explicit future switch contract only.
+      // It does NOT teleport, does NOT switch rooms, and does NOT touch sky/runtime root.
+      const canPrepareScene02SwitchContract =
+        scene02HandoffReady &&
+        scene02VisualIsolationLevel > 0.76 &&
+        scene01SoftFadeLevel > 0.48 &&
+        transitionZoneLevel > 0.72;
+
+      if (canPrepareScene02SwitchContract && !scene02SwitchContractReady) {
+        scene02SwitchContractHoldTime += deltaSeconds;
+
+        if (scene02SwitchContractHoldTime > 0.8) {
+          scene02SwitchContractReady = true;
+        }
+      } else if (!scene02SwitchContractReady) {
+        scene02SwitchContractHoldTime = Math.max(
+          0,
+          scene02SwitchContractHoldTime - deltaSeconds * 0.75
+        );
+      }
+
+      const scene02SwitchContractTarget = scene02SwitchContractReady ? 1 : 0;
+
+      scene02SwitchContractLevel = THREE.MathUtils.lerp(
+        scene02SwitchContractLevel,
+        scene02SwitchContractTarget,
+        0.04
+      );
+
+      const scene02SwitchContract = createScene02SwitchContract({
+        ready: scene02SwitchContractReady,
+        level: scene02SwitchContractLevel,
+        phase: scene02SwitchContractReady
+          ? "switch-contract-ready"
+          : scene02HandoffReady
+            ? "handoff-preparing"
+            : "not-ready",
+        proximity: transitionZoneLevel,
+        scene02ShellValue: scene02ShellLevel,
+        scene02VisualIsolationValue: scene02VisualIsolationLevel,
+      });
+
+      // Make the contract publicly available for the future runtime switch layer.
+      root.userData.scene02SwitchContract = scene02SwitchContract;
+
+      // SCENE02-BOOTSTRAP-06 - Soft Runtime Switch Stub.
+      // This creates a safe future switch stub only.
+      // It does NOT navigate, teleport, switch rooms, or touch sky.
+      const canArmScene02RuntimeSwitchStub =
+        scene02SwitchContractReady &&
+        scene02SwitchContractLevel > 0.78 &&
+        scene02HandoffReady &&
+        transitionZoneLevel > 0.72;
+
+      if (canArmScene02RuntimeSwitchStub && !scene02RuntimeSwitchStubArmed) {
+        scene02RuntimeSwitchStubHoldTime += deltaSeconds;
+
+        if (scene02RuntimeSwitchStubHoldTime > 0.75) {
+          scene02RuntimeSwitchStubArmed = true;
+        }
+      } else if (!scene02RuntimeSwitchStubArmed) {
+        scene02RuntimeSwitchStubHoldTime = Math.max(
+          0,
+          scene02RuntimeSwitchStubHoldTime - deltaSeconds * 0.75
+        );
+      }
+
+      const scene02RuntimeSwitchStubTarget = scene02RuntimeSwitchStubArmed ? 1 : 0;
+
+      scene02RuntimeSwitchStubLevel = THREE.MathUtils.lerp(
+        scene02RuntimeSwitchStubLevel,
+        scene02RuntimeSwitchStubTarget,
+        0.04
+      );
+
+      const scene02RuntimeSwitchStub = createScene02RuntimeSwitchStub({
+        armed: scene02RuntimeSwitchStubArmed,
+        level: scene02RuntimeSwitchStubLevel,
+        phase: scene02RuntimeSwitchStubArmed
+          ? "runtime-switch-stub-armed"
+          : scene02SwitchContractReady
+            ? "contract-ready"
+            : "not-ready",
+        proximity: transitionZoneLevel,
+        switchContract: scene02SwitchContract,
+      });
+
+      root.userData.scene02RuntimeSwitch = scene02RuntimeSwitchStub;
+      // SCENE02-BOOTSTRAP-07A — update runtime diagnostic marker.
+      // This only exposes diagnostic state. It does not affect visuals or switching.
+      root.userData.scene02RuntimeDiagnostic = createScene02RuntimeDiagnostic({
+        transitionState: root.userData.scene01Transition ?? null,
+        switchContract: root.userData.scene02SwitchContract ?? scene02SwitchContract,
+        runtimeSwitchStub: scene02RuntimeSwitchStub,
+        proximity: transitionZoneLevel,
+      });
+
+      // SCENE02-BOOTSTRAP-02 - derive minimal scene02 state.
+      // Still no navigation, no teleport, no room switch.
+      const scene01TransitionPhase =
+        scene02RuntimeSwitchStubArmed
+          ? "scene02-runtime-switch-stub-armed"
+          : scene02SwitchContractReady
+            ? "scene02-switch-contract-ready"
+            : scene02VisualIsolationLevel > 0.76
+              ? "scene02-visual-isolation"
+              : scene02ShellReady
+                ? "path-into-unknown-shell"
+                : preScene02HandoffLevel > 0.82
+                  ? "pre-scene02-handoff"
+                  : enterReadinessLevel > 0.72
+                    ? "enter-ready"
+                    : firstPassageTriggered
+                      ? "first-passage"
+                      : "threshold-ready";
+
+      const scene02Status =
+        scene02RuntimeSwitchStubArmed
+          ? "runtime-switch-stub-armed"
+          : scene02SwitchContractReady
+            ? "switch-contract-ready"
+            : scene02VisualIsolationTriggered
+              ? scene02HandoffReady
+                ? "handoff-ready"
+                : "visual-isolation"
+              : scene02ShellActivated
+                ? "shell-active"
+                : preScene02HandoffTriggered
+                  ? "warming"
+                  : "dormant";
+
+      const scene02Phase =
+        scene02RuntimeSwitchStubArmed
+          ? "runtime-switch-stub-armed"
+          : scene02SwitchContractReady
+            ? "switch-contract-ready"
+            : scene02VisualIsolationTriggered
+              ? scene02HandoffReady
+                ? "handoff-ready"
+                : "visual-isolation"
+              : scene02ShellActivated
+                ? scene02ShellReady
+                  ? "path-open"
+                  : "shell-emerging"
+                : preScene02HandoffTriggered
+                  ? "preparing"
+                  : "locked";
+
+      updateLocalSceneStateRegistry({
+        scene01Phase: scene01TransitionPhase,
+        scene01Complete: scene02HandoffReady,
+        scene01SupportFadeValue: scene01SoftFadeLevel,
+        scene02Status,
+        scene02Phase,
+        scene02ShellActive: scene02ShellActivated,
+        scene02ShellValue: scene02ShellLevel,
+        scene02VisualIsolationActive: scene02VisualIsolationTriggered,
+        scene02VisualIsolationValue: scene02VisualIsolationLevel,
+        scene02HandoffReady,
+        scene02SwitchContractReadyValue: scene02SwitchContractReady,
+        scene02SwitchContractLevelValue: scene02SwitchContractLevel,
+        scene02SwitchContract,
+        scene02RuntimeSwitchStubArmedValue: scene02RuntimeSwitchStubArmed,
+        scene02RuntimeSwitchStubLevelValue: scene02RuntimeSwitchStubLevel,
+        scene02RuntimeSwitchStub,
+      });
+
       // Public readiness state for future real Scene 02 transition.
       // This still does not perform navigation yet.
       root.userData.scene01Transition = {
@@ -3145,21 +3970,27 @@ export function createTempleSanctuary() {
         scene02ShellActivated,
         scene02ShellLevel,
         scene02ShellHold: scene02ShellHoldTime,
-        scene02ShellReady: scene02ShellLevel > 0.82,
+        scene02ShellReady,
+        scene02HandoffReady,
+        scene02VisualIsolationTriggered,
+        scene02VisualIsolationLevel,
+        scene02VisualIsolationReady: scene02VisualIsolationLevel > 0.76,
+        scene01SoftFadeLevel,
+        scene01SupportSecondary: scene01SoftFadeLevel > 0.62,
+        scene02SwitchContractReady,
+        scene02SwitchContractLevel,
+        scene02SwitchContractPhase: scene02SwitchContract.phase,
+        scene02RuntimeSwitchStubArmed,
+        scene02RuntimeSwitchStubLevel,
+        scene02RuntimeSwitchStubPhase: scene02RuntimeSwitchStub.phase,
         hold: firstPassageHoldTime,
         readiness: transitionReadinessLevel,
         proximity: transitionZoneLevel,
-        phase:
-          scene02ShellLevel > 0.82
-            ? "path-into-unknown-shell"
-            : preScene02HandoffLevel > 0.82
-              ? "pre-scene02-handoff"
-            : enterReadinessLevel > 0.72
-              ? "enter-ready"
-              : firstPassageTriggered
-                ? "first-passage"
-                : "threshold-ready",
+        phase: scene01TransitionPhase,
       };
+
+      root.userData.sceneRegistry = localSceneStateRegistry;
+      root.userData.scene02 = localSceneStateRegistry.scene02;
 
       transitionPortalParticles.visible = portalAmount > 0.025;
       transitionPortalParticleMaterial.opacity =
@@ -3240,11 +4071,56 @@ export function createTempleSanctuary() {
         scene02ShellLevel: 0,
         scene02ShellHold: 0,
         scene02ShellReady: false,
+        scene02HandoffReady: false,
+        scene02VisualIsolationTriggered: false,
+        scene02VisualIsolationLevel: 0,
+        scene02VisualIsolationReady: false,
+        scene01SoftFadeLevel: 0,
+        scene01SupportSecondary: false,
+        scene02SwitchContractReady: false,
+        scene02SwitchContractLevel: 0,
+        scene02SwitchContractPhase: "not-ready",
+        scene02RuntimeSwitchStubArmed: false,
+        scene02RuntimeSwitchStubLevel: 0,
+        scene02RuntimeSwitchStubPhase: "not-ready",
         hold: 0,
         readiness: 0,
         proximity: 0,
         phase: "closed",
       };
+    },
+    getSceneStateRegistry() {
+      return root.userData.sceneRegistry ?? localSceneStateRegistry;
+    },
+    getScene02State() {
+      return root.userData.scene02 ?? localSceneStateRegistry.scene02;
+    },
+    getScene02SwitchContract() {
+      return root.userData.scene02SwitchContract ?? createScene02SwitchContract({
+        ready: false,
+        level: 0,
+        phase: "not-ready",
+        proximity: 0,
+        scene02ShellValue: 0,
+        scene02VisualIsolationValue: 0,
+      });
+    },
+    getScene02RuntimeSwitchStub() {
+      return root.userData.scene02RuntimeSwitch ?? createScene02RuntimeSwitchStub({
+        armed: false,
+        level: 0,
+        phase: "not-ready",
+        proximity: 0,
+        switchContract: root.userData.scene02SwitchContract ?? null,
+      });
+    },
+    getScene02RuntimeDiagnostic() {
+      return root.userData.scene02RuntimeDiagnostic ?? createScene02RuntimeDiagnostic({
+        transitionState: root.userData.scene01Transition ?? null,
+        switchContract: root.userData.scene02SwitchContract ?? null,
+        runtimeSwitchStub: root.userData.scene02RuntimeSwitch ?? null,
+        proximity: 0,
+      });
     },
     isRitualChargeComplete() {
       return ritualChargeComplete;
