@@ -659,6 +659,102 @@ export function createScene02ActualBindingState({
   };
 }
 
+// SCENE02-RUNTIME-04 — Scene02 visual/runtime state helpers.
+// These helpers build state/userData objects only.
+// They do not create geometry, move objects, teleport, switch rooms, or touch sky/XRRoot.
+
+export function createScene02VisualResponseState({
+  active = null,
+  level = 0,
+  phase = null,
+  source = "currentLocalSceneId",
+  currentLocalSceneId = "scene01-sanctuary",
+} = {}) {
+  const normalizedLevel = Number.isFinite(level) ? level : 0;
+  const computedActive =
+    active === null ? normalizedLevel > 0.08 : Boolean(active);
+
+  return {
+    version: "scene02-visual-response-v0.1",
+    active: computedActive,
+    level: normalizedLevel,
+    phase:
+      phase ??
+      (normalizedLevel > 0.72
+        ? "scene02-visual-priority"
+        : normalizedLevel > 0.08
+          ? "scene02-visual-priority-emerging"
+          : "not-active"),
+    source,
+    currentLocalSceneId,
+    safety: {
+      visualResponseOnly: true,
+      performsTeleportNow: false,
+      performsRoomSwitchNow: false,
+      mutatesXRRootNow: false,
+      touchesSkyNow: false,
+    },
+  };
+}
+
+export function createScene02RuntimeContainerState({
+  prepared = false,
+  level = 0,
+  phase = null,
+  mode = "empty-container-preparation",
+  parent = "TempleSanctuaryTransitionPortalRoot",
+  entryAnchor = "path-threshold-forward",
+  entryDirection = "forward-through-portal",
+  acceptsFutureChildren = false,
+  currentChildrenBound = false,
+  existingVisualLayersStillInPlace = true,
+  boundLayerKeys = [],
+  futureBindingTargets = [
+    "PathIntoUnknownScene02Shell",
+    "PathIntoUnknownVisualIsolationLayer",
+    "TempleSanctuaryPreScene02Handoff",
+  ],
+} = {}) {
+  const normalizedLevel = Number.isFinite(level) ? level : 0;
+  const normalizedBoundLayerKeys = Array.isArray(boundLayerKeys)
+    ? boundLayerKeys.filter((key) => typeof key === "string" && key.length > 0)
+    : [];
+
+  return {
+    version: "scene02-runtime-container-v0.1",
+    sceneId: "scene02-path-into-unknown",
+    prepared: Boolean(prepared),
+    level: normalizedLevel,
+    phase:
+      phase ??
+      (prepared
+        ? "scene02-container-prepared"
+        : normalizedLevel > 0.01
+          ? "scene02-container-preparing"
+          : "not-ready"),
+    mode,
+    anchor: {
+      parent,
+      entryAnchor,
+      entryDirection,
+    },
+    acceptsFutureChildren: Boolean(acceptsFutureChildren),
+    currentChildrenBound: Boolean(currentChildrenBound),
+    existingVisualLayersStillInPlace: Boolean(existingVisualLayersStillInPlace),
+    futureBindingTargets,
+    boundLayerKeys: normalizedBoundLayerKeys,
+    safety: {
+      emptyContainerOnly: !currentChildrenBound,
+      existingLayersReparentedNow: Boolean(currentChildrenBound),
+      performsTeleportNow: false,
+      performsRoomSwitchNow: false,
+      changesCameraNow: false,
+      touchesSkyNow: false,
+      touchesXRRootNow: false,
+    },
+  };
+}
+
 const EXTERNALIZED_STATE_HELPERS = [
   "createScene02SwitchContract",
   "createScene02RuntimeSwitchStub",
@@ -671,6 +767,8 @@ const EXTERNALIZED_STATE_HELPERS = [
   "createScene02TransformSnapshot",
   "createScene02BindingRuntimeSnapshot",
   "bindScene02LayerToContainerPreserveWorld",
+  "createScene02VisualResponseState",
+  "createScene02RuntimeContainerState",
 ];
 
 export function createPathIntoUnknownSceneRuntime({

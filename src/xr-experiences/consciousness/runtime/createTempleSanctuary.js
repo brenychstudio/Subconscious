@@ -13,6 +13,8 @@ import {
   createScene02TransformSnapshot as createScene02TransformSnapshotFromPathScene,
   createScene02BindingRuntimeSnapshot as createScene02BindingRuntimeSnapshotFromPathScene,
   bindScene02LayerToContainerPreserveWorld as bindScene02LayerToContainerPreserveWorldFromPathScene,
+  createScene02VisualResponseState as createScene02VisualResponseStateFromPathScene,
+  createScene02RuntimeContainerState as createScene02RuntimeContainerStateFromPathScene,
 } from "./createPathIntoUnknownScene.js";
 
 function disposeMaterial(material) {
@@ -1771,23 +1773,16 @@ export function createTempleSanctuary() {
   scene02RuntimeContainerRoot.position.set(0, 0, -1.18);
   transitionPortalRoot.add(scene02RuntimeContainerRoot);
 
-  scene02RuntimeContainerRoot.userData = {
-    version: "scene02-runtime-container-v0.1",
-    sceneId: "scene02-path-into-unknown",
-    prepared: false,
-    level: 0,
-    mode: "empty-container-preparation",
-    acceptsFutureChildren: true,
-    currentChildrenBound: false,
-    safety: {
-      emptyContainerOnly: true,
-      existingLayersReparentedNow: false,
-      performsTeleportNow: false,
-      performsRoomSwitchNow: false,
-      touchesSkyNow: false,
-      touchesXRRootNow: false,
-    },
-  };
+  scene02RuntimeContainerRoot.userData =
+    createScene02RuntimeContainerStateFromPathScene({
+      prepared: false,
+      level: 0,
+      phase: "not-ready",
+      acceptsFutureChildren: true,
+      currentChildrenBound: false,
+      existingVisualLayersStillInPlace: true,
+      boundLayerKeys: [],
+    });
 
   // SCENE02-BOOTSTRAP-03 - Scene02 Visual Isolation Layer.
   // This starts separating Scene 02 as its own visual state.
@@ -4205,26 +4200,13 @@ export function createTempleSanctuary() {
         }
       }
 
-      root.userData.scene02VisualResponse = {
-        version: "scene02-visual-response-v0.1",
-        active: scene02SemanticVisualPriorityLevel > 0.08,
-        level: scene02SemanticVisualPriorityLevel,
-        phase:
-          scene02SemanticVisualPriorityLevel > 0.72
-            ? "scene02-visual-priority"
-            : scene02SemanticVisualPriorityLevel > 0.08
-              ? "scene02-visual-priority-emerging"
-              : "not-active",
-        source: "currentLocalSceneId",
-        currentLocalSceneId: root.userData.currentLocalSceneId ?? "scene01-sanctuary",
-        safety: {
-          visualResponseOnly: true,
-          performsTeleportNow: false,
-          performsRoomSwitchNow: false,
-          mutatesXRRootNow: false,
-          touchesSkyNow: false,
-        },
-      };
+      root.userData.scene02VisualResponse =
+        createScene02VisualResponseStateFromPathScene({
+          active: scene02SemanticVisualPriorityLevel > 0.08,
+          level: scene02SemanticVisualPriorityLevel,
+          currentLocalSceneId:
+            root.userData.currentLocalSceneId ?? "scene01-sanctuary",
+        });
 
       // SCENE02-BOOTSTRAP-07F — Scene02 Container Preparation.
       // Empty runtime container only. This prepares a future place for real Scene02 logic,
@@ -4258,40 +4240,27 @@ export function createTempleSanctuary() {
 
       scene02RuntimeContainerRoot.visible = scene02RuntimeContainerLevel > 0.01;
 
-      scene02RuntimeContainerRoot.userData = {
-        version: "scene02-runtime-container-v0.1",
-        sceneId: "scene02-path-into-unknown",
-        prepared: scene02RuntimeContainerPrepared,
-        level: scene02RuntimeContainerLevel,
-        phase: scene02RuntimeContainerPrepared
-          ? "scene02-container-prepared"
-          : canPrepareScene02RuntimeContainer
-            ? "scene02-container-preparing"
-            : "not-ready",
-        mode: "empty-container-preparation",
-        anchor: {
-          parent: "TempleSanctuaryTransitionPortalRoot",
-          entryAnchor: "path-threshold-forward",
-          entryDirection: "forward-through-portal",
-        },
-        acceptsFutureChildren: scene02RuntimeContainerPrepared,
-        currentChildrenBound: false,
-        existingVisualLayersStillInPlace: true,
-        futureBindingTargets: [
-          "PathIntoUnknownScene02Shell",
-          "PathIntoUnknownVisualIsolationLayer",
-          "TempleSanctuaryPreScene02Handoff",
-        ],
-        safety: {
-          emptyContainerOnly: true,
-          existingLayersReparentedNow: false,
-          performsTeleportNow: false,
-          performsRoomSwitchNow: false,
-          changesCameraNow: false,
-          touchesSkyNow: false,
-          touchesXRRootNow: false,
-        },
-      };
+      scene02RuntimeContainerRoot.userData =
+        createScene02RuntimeContainerStateFromPathScene({
+          prepared: scene02RuntimeContainerPrepared,
+          level: scene02RuntimeContainerLevel,
+          phase: scene02RuntimeContainerPrepared
+            ? "scene02-container-prepared"
+            : canPrepareScene02RuntimeContainer
+              ? "scene02-container-preparing"
+              : "not-ready",
+          acceptsFutureChildren: scene02RuntimeContainerPrepared,
+          currentChildrenBound:
+            Boolean(scene02ContainerActualBindingComplete) ||
+            Boolean(scene02RuntimeContainerRoot.userData?.currentChildrenBound),
+          existingVisualLayersStillInPlace:
+            !scene02ContainerActualBindingComplete &&
+            (scene02RuntimeContainerRoot.userData?.existingVisualLayersStillInPlace ??
+              true),
+          boundLayerKeys: scene02ContainerActualBindingComplete
+            ? ["scene02ShellRoot", "scene02IsolationRoot", "preScene02Root"]
+            : scene02RuntimeContainerRoot.userData?.boundLayerKeys ?? [],
+        });
 
       root.userData.scene02RuntimeContainer = scene02RuntimeContainerRoot.userData;
 
@@ -4975,56 +4944,28 @@ export function createTempleSanctuary() {
       };
     },
     getScene02VisualResponse() {
-      return root.userData.scene02VisualResponse ?? {
-        version: "scene02-visual-response-v0.1",
-        active: false,
-        level: 0,
-        phase: "not-active",
-        source: "currentLocalSceneId",
-        currentLocalSceneId: root.userData.currentLocalSceneId ?? "scene01-sanctuary",
-        safety: {
-          visualResponseOnly: true,
-          performsTeleportNow: false,
-          performsRoomSwitchNow: false,
-          mutatesXRRootNow: false,
-          touchesSkyNow: false,
-        },
-      };
+      return root.userData.scene02VisualResponse ??
+        createScene02VisualResponseStateFromPathScene({
+          active: false,
+          level: 0,
+          phase: "not-active",
+          currentLocalSceneId:
+            root.userData.currentLocalSceneId ?? "scene01-sanctuary",
+        });
     },
     isRitualChargeComplete() {
       return ritualChargeComplete;
     },
     getScene02RuntimeContainer() {
-      return root.userData.scene02RuntimeContainer ?? {
-        version: "scene02-runtime-container-v0.1",
-        sceneId: "scene02-path-into-unknown",
-        prepared: false,
-        level: 0,
-        phase: "not-ready",
-        mode: "empty-container-preparation",
-        anchor: {
-          parent: "TempleSanctuaryTransitionPortalRoot",
-          entryAnchor: "path-threshold-forward",
-          entryDirection: "forward-through-portal",
-        },
-        acceptsFutureChildren: false,
-        currentChildrenBound: false,
-        existingVisualLayersStillInPlace: true,
-        futureBindingTargets: [
-          "PathIntoUnknownScene02Shell",
-          "PathIntoUnknownVisualIsolationLayer",
-          "TempleSanctuaryPreScene02Handoff",
-        ],
-        safety: {
-          emptyContainerOnly: true,
-          existingLayersReparentedNow: false,
-          performsTeleportNow: false,
-          performsRoomSwitchNow: false,
-          changesCameraNow: false,
-          touchesSkyNow: false,
-          touchesXRRootNow: false,
-        },
-      };
+      return root.userData.scene02RuntimeContainer ??
+        createScene02RuntimeContainerStateFromPathScene({
+          prepared: false,
+          level: 0,
+          phase: "not-ready",
+          acceptsFutureChildren: false,
+          currentChildrenBound: false,
+          existingVisualLayersStillInPlace: true,
+        });
     },
     getScene02ContainerBindingContract() {
       return root.userData.scene02ContainerBindingContract ?? createScene02ContainerBindingContract({
