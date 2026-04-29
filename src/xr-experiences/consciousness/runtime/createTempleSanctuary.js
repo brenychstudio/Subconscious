@@ -1,4 +1,4 @@
-import * as THREE from "three";
+﻿import * as THREE from "three";
 import { templeSanctuaryPreset } from "../presets/templeSanctuaryPreset.js";
 import {
   createPathIntoUnknownSceneRuntime,
@@ -1567,7 +1567,7 @@ export function createTempleSanctuary() {
   transitionReadinessGlow.position.set(0, 0.36, transitionTriggerZ);
   transitionReadinessRoot.add(transitionReadinessGlow);
 
-  // SCENE01-THRESHOLD-10D — First Passage Trigger / Soft Scene State Shift.
+  // SCENE01-THRESHOLD-10D вЂ” First Passage Trigger / Soft Scene State Shift.
   // This is the first real "passage activated" state, but it does NOT teleport
   // and does NOT switch rooms yet.
   const firstPassageRoot = new THREE.Group();
@@ -2023,7 +2023,7 @@ export function createTempleSanctuary() {
   scene02GuideLight.position.set(0, 0, -2.2);
   scene02ShellRoot.add(scene02GuideLight);
 
-  // SCENE02-BOOTSTRAP-07F — Scene02 Runtime Container Preparation.
+  // SCENE02-BOOTSTRAP-07F вЂ” Scene02 Runtime Container Preparation.
   // Empty container root only. Existing Scene02 visual layers are NOT reparented yet.
   // No teleport, no room switch, no XRRoot changes, no sky changes.
   const scene02RuntimeContainerRoot = new THREE.Group();
@@ -2043,7 +2043,7 @@ export function createTempleSanctuary() {
       boundLayerKeys: [],
     });
 
-  // SCENE02-VISUAL-01 — Cinematic Path Into the Unknown visual layer.
+  // SCENE02-VISUAL-01 вЂ” Cinematic Path Into the Unknown visual layer.
   // Local authored visual proof only: no sky, no XRRoot, no teleport, no hard room switch.
   function createScene02CinematicSoftDiscTexture({
     size = 128,
@@ -2209,7 +2209,7 @@ export function createTempleSanctuary() {
   scene02PathStreakLines.renderOrder = 90;
   scene02CinematicPathRoot.add(scene02PathStreakLines);
 
-  // SCENE02-VISUAL-02 — additional acceleration streak field.
+  // SCENE02-VISUAL-02 вЂ” additional acceleration streak field.
   // Gives the path stronger forward motion without camera teleport or room switch.
   const scene02PathAccelerationCount = 96;
   const scene02PathAccelerationPositions = new Float32Array(
@@ -2739,14 +2739,14 @@ export function createTempleSanctuary() {
     localSceneStateRegistry.scene02.runtimeSwitchStubArmed = scene02RuntimeSwitchStubArmedValue;
     localSceneStateRegistry.scene02.runtimeSwitchStubLevel = scene02RuntimeSwitchStubLevelValue;
     localSceneStateRegistry.scene02.runtimeSwitchStub = scene02RuntimeSwitchStub;
-    // SCENE02-BOOTSTRAP-07C — registry binding only.
+    // SCENE02-BOOTSTRAP-07C вЂ” registry binding only.
     // Adapter object is now exposed through sceneRegistry,
     // but this does not switch scenes, teleport, or mutate currentLocalSceneId.
     localSceneStateRegistry.scene02.adapterObjectReady = scene02AdapterObjectReadyValue;
     localSceneStateRegistry.scene02.adapterObjectLevel = scene02AdapterObjectLevelValue;
     localSceneStateRegistry.scene02.adapterObject = scene02AdapterObject;
 
-    // SCENE02-BOOTSTRAP-07F — runtime container registry binding.
+    // SCENE02-BOOTSTRAP-07F вЂ” runtime container registry binding.
     // This only exposes the prepared empty container through sceneRegistry.
     // It does not move visual layers yet.
     localSceneStateRegistry.scene02.runtimeContainerPrepared =
@@ -2755,7 +2755,7 @@ export function createTempleSanctuary() {
       scene02RuntimeContainerLevelValue;
     localSceneStateRegistry.scene02.runtimeContainer = scene02RuntimeContainer;
 
-    // SCENE02-BOOTSTRAP-07G — container binding contract registry binding.
+    // SCENE02-BOOTSTRAP-07G вЂ” container binding contract registry binding.
     // Contract only. Existing layers are not reparented in this step.
     localSceneStateRegistry.scene02.containerBindingContractReady =
       scene02ContainerBindingContractReadyValue;
@@ -2764,7 +2764,7 @@ export function createTempleSanctuary() {
     localSceneStateRegistry.scene02.containerBindingContract =
       scene02ContainerBindingContract;
 
-    // SCENE02-BOOTSTRAP-07H — binding preflight registry binding.
+    // SCENE02-BOOTSTRAP-07H вЂ” binding preflight registry binding.
     // Preflight only. Existing layers are not reparented in this step.
     localSceneStateRegistry.scene02.containerBindingPreflightReady =
       scene02ContainerBindingPreflightReadyValue;
@@ -2801,7 +2801,7 @@ export function createTempleSanctuary() {
     return createScene02RuntimeSwitchStubFromPathScene(options);
   }
 
-  // SCENE02-BOOTSTRAP-07A — Runtime Switch Diagnostic Marker Only.
+  // SCENE02-BOOTSTRAP-07A вЂ” Runtime Switch Diagnostic Marker Only.
   // Diagnostic only: no adapter, no room switch, no teleport, no visual changes.
   function createScene02RuntimeDiagnostic(options = {}) {
     return createScene02RuntimeDiagnosticFromPathScene(options);
@@ -2814,13 +2814,13 @@ export function createTempleSanctuary() {
     return createScene02AdapterObjectFromPathScene(options);
   }
 
-  // SCENE02-BOOTSTRAP-07G — Container Binding Contract Only.
+  // SCENE02-BOOTSTRAP-07G вЂ” Container Binding Contract Only.
   // Contract only: no reparent, no room switch, no teleport, no visual movement.
   function createScene02ContainerBindingContract(options = {}) {
     return createScene02ContainerBindingContractFromPathScene(options);
   }
 
-  // SCENE02-BOOTSTRAP-07H — Binding Preflight Only.
+  // SCENE02-BOOTSTRAP-07H вЂ” Binding Preflight Only.
   // This captures safe transform/parent snapshots for future binding.
   // It does NOT reparent, move objects, change visuals, switch rooms, or touch sky.
   function roundScene02PreflightNumber(value) {
@@ -2835,7 +2835,7 @@ export function createTempleSanctuary() {
     return createScene02ContainerBindingPreflightFromPathScene(options);
   }
 
-  // SCENE02-BOOTSTRAP-08A — Controlled Container Binding helpers.
+  // SCENE02-BOOTSTRAP-08A вЂ” Controlled Container Binding helpers.
   // Actual binding, but controlled: preserves world transform and runs once.
   function createScene02BindingRuntimeSnapshot(object) {
     return createScene02BindingRuntimeSnapshotFromPathScene(object);
@@ -3800,6 +3800,7 @@ export function createTempleSanctuary() {
       const portalPullStrength = transitionPortal.portalPullStrength ?? 0.26;
       const portalDepthOpacity =
         transitionPortal.portalDepthOpacity ?? transitionPortal.coreOpacity ?? 0.36;
+      const portalPullCleanup = preset.portalPullCleanup ?? {};
 
       transitionPortalRoot.visible = portalAmount > 0.015;
 
@@ -3846,18 +3847,38 @@ export function createTempleSanctuary() {
 
       // Subtle living opacity variation. No flashing, no overexposure.
       transitionPortalRing.material.opacity =
-        portalAmount * THREE.MathUtils.lerp(0.26, 0.46, mechanismBreath);
+        portalAmount *
+        THREE.MathUtils.lerp(
+          portalPullCleanup.portalRingMin ?? 0.16,
+          portalPullCleanup.portalRingMax ?? 0.30,
+          mechanismBreath
+        );
 
       transitionPortalInnerRing.material.opacity =
-        portalAmount * THREE.MathUtils.lerp(0.16, 0.34, 1 - mechanismBreath);
+        portalAmount *
+        THREE.MathUtils.lerp(
+          portalPullCleanup.innerRingMin ?? 0.08,
+          portalPullCleanup.innerRingMax ?? 0.20,
+          1 - mechanismBreath
+        );
 
       // Keep the dark center present but gently breathing.
       transitionPortalCore.material.opacity =
-        portalAmount * THREE.MathUtils.lerp(0.12, 0.24, mechanismBreath);
+        portalAmount *
+        THREE.MathUtils.lerp(
+          portalPullCleanup.coreMin ?? 0.24,
+          portalPullCleanup.coreMax ?? 0.42,
+          mechanismBreath
+        );
 
       // Local light only. This gives the portal a living presence without brightening the whole world.
       transitionPortalLight.intensity =
-        portalAmount * THREE.MathUtils.lerp(0.34, 1.15, mechanismBreath);
+        portalAmount *
+        THREE.MathUtils.lerp(
+          portalPullCleanup.portalLightMin ?? 0.22,
+          portalPullCleanup.portalLightMax ?? 0.82,
+          mechanismBreath
+        );
 
       transitionPortalLight.distance =
         THREE.MathUtils.lerp(3.2, 5.2, portalAmount);
@@ -3892,7 +3913,12 @@ export function createTempleSanctuary() {
         passageRoot.scale.setScalar(THREE.MathUtils.lerp(0.82, 1.08, passageAmount));
 
         passageCoreMaterial.opacity =
-          passageAmount * THREE.MathUtils.lerp(0.26, 0.48, passageBreath);
+          passageAmount *
+          THREE.MathUtils.lerp(
+            portalPullCleanup.passageCoreMin ?? 0.34,
+            portalPullCleanup.passageCoreMax ?? 0.58,
+            passageBreath
+          );
 
         passageCore.scale.setScalar(
           THREE.MathUtils.lerp(0.82, 1.04, passageBreath) *
@@ -3913,7 +3939,12 @@ export function createTempleSanctuary() {
 
         passageParticles.visible = passageAmount > 0.04;
         passageParticleMaterial.opacity =
-          passageAmount * THREE.MathUtils.lerp(0.22, 0.58, passageBreath);
+          passageAmount *
+          THREE.MathUtils.lerp(
+            portalPullCleanup.passageParticleMin ?? 0.14,
+            portalPullCleanup.passageParticleMax ?? 0.36,
+            passageBreath
+          );
 
         if (passageParticles.visible) {
           const passageAttr = passageParticleGeometry.getAttribute("position");
@@ -3960,7 +3991,12 @@ export function createTempleSanctuary() {
 
       thresholdPullField.visible = pullAmount > 0.025;
       thresholdPullMaterial.opacity =
-        pullAmount * THREE.MathUtils.lerp(0.26, 0.78, pullBreath);
+        pullAmount *
+        THREE.MathUtils.lerp(
+          portalPullCleanup.pullOpacityMin ?? 0.16,
+          portalPullCleanup.pullOpacityMax ?? 0.48,
+          pullBreath
+        );
 
       if (thresholdPullField.visible) {
         const pullAttr = thresholdPullGeometry.getAttribute("position");
@@ -4087,8 +4123,11 @@ export function createTempleSanctuary() {
           THREE.MathUtils.lerp(1.8, 3.4, transitionZonePresence);
 
         // The pull field becomes slightly more persuasive when the viewer approaches the zone.
-        thresholdPullMaterial.opacity += transitionZoneLevel * 0.14;
-        transitionPortalLight.intensity += transitionZoneLevel * 0.18;
+        thresholdPullMaterial.opacity +=
+          transitionZoneLevel * (portalPullCleanup.pullApproachBoost ?? 0.08);
+        transitionPortalLight.intensity +=
+          transitionZoneLevel *
+          (portalPullCleanup.portalApproachLightBoost ?? 0.08);
       }
 
       // Public readiness state for future Scene 02 trigger.
@@ -4736,7 +4775,7 @@ export function createTempleSanctuary() {
       });
 
       root.userData.scene02RuntimeSwitch = scene02RuntimeSwitchStub;
-      // SCENE02-BOOTSTRAP-07A — update runtime diagnostic marker.
+      // SCENE02-BOOTSTRAP-07A вЂ” update runtime diagnostic marker.
       // This only exposes diagnostic state. It does not affect visuals or switching.
       root.userData.scene02RuntimeDiagnostic = createScene02RuntimeDiagnostic({
         transitionState: root.userData.scene01Transition ?? null,
@@ -4998,7 +5037,7 @@ export function createTempleSanctuary() {
             root.userData.currentLocalSceneId ?? "scene01-sanctuary",
         });
 
-      // SCENE02-BOOTSTRAP-07F — Scene02 Container Preparation.
+      // SCENE02-BOOTSTRAP-07F вЂ” Scene02 Container Preparation.
       // Empty runtime container only. This prepares a future place for real Scene02 logic,
       // but does not reparent existing visual layers yet.
       const canPrepareScene02RuntimeContainer =
@@ -5054,7 +5093,7 @@ export function createTempleSanctuary() {
 
       root.userData.scene02RuntimeContainer = scene02RuntimeContainerRoot.userData;
 
-      // SCENE02-RUNTIME-01 — first external Scene02 runtime module shell.
+      // SCENE02-RUNTIME-01 вЂ” first external Scene02 runtime module shell.
       // This does not move visuals or switch rooms. It wraps the prepared Scene02 container.
       const pathIntoUnknownSceneRuntime = createPathIntoUnknownSceneRuntime({
         containerRoot: scene02RuntimeContainerRoot,
@@ -5066,7 +5105,7 @@ export function createTempleSanctuary() {
       root.userData.scene02RuntimeModule =
         pathIntoUnknownSceneRuntime.getSnapshot();
 
-      // SCENE02-BOOTSTRAP-07G — Container Binding Contract Only.
+      // SCENE02-BOOTSTRAP-07G вЂ” Container Binding Contract Only.
       // Creates a contract for future binding/reparenting, but does NOT bind or reparent now.
       const canPrepareScene02ContainerBindingContract =
         scene02RuntimeContainerPrepared &&
@@ -5122,7 +5161,7 @@ export function createTempleSanctuary() {
 
       root.userData.scene02ContainerBindingContract = scene02ContainerBindingContract;
 
-      // SCENE02-BOOTSTRAP-07H — Binding Preflight Only.
+      // SCENE02-BOOTSTRAP-07H вЂ” Binding Preflight Only.
       // Captures object/container readiness and transform snapshots.
       // Does NOT reparent, move, switch rooms, teleport, or touch sky.
       const canPrepareScene02ContainerBindingPreflight =
@@ -5181,7 +5220,7 @@ export function createTempleSanctuary() {
       root.userData.scene02ContainerBindingPreflight =
         scene02ContainerBindingPreflight;
 
-      // SCENE02-BOOTSTRAP-08A — Controlled Container Binding.
+      // SCENE02-BOOTSTRAP-08A вЂ” Controlled Container Binding.
       // This is the first actual controlled binding step.
       // It reparents only Scene02 visual layers into the Scene02 container.
       // No teleport, no camera move, no XRRoot, no sky changes.
@@ -5301,7 +5340,7 @@ export function createTempleSanctuary() {
         containerRoot: scene02RuntimeContainerRoot,
       });
 
-      // SCENE02-RUNTIME-01 — update external Scene02 runtime module shell.
+      // SCENE02-RUNTIME-01 вЂ” update external Scene02 runtime module shell.
       // This mirrors current Scene02 state into a separate module without moving logic yet.
       if (scene02ContainerActualBindingComplete) {
         pathIntoUnknownSceneRuntime.markBoundLayers(
@@ -5337,7 +5376,7 @@ export function createTempleSanctuary() {
         actualBindingComplete: scene02ContainerActualBindingComplete,
       });
 
-      // SCENE02-VISUAL-01 — Cinematic Path Into the Unknown Pass.
+      // SCENE02-VISUAL-01 вЂ” Cinematic Path Into the Unknown Pass.
       // Bold but controlled: visible tunnel/depth/pull layer only.
       // No sky, no XRRoot, no teleport, no hard room switch.
       {
@@ -5374,17 +5413,31 @@ export function createTempleSanctuary() {
 
         scene02CinematicVoidMaterial.opacity = THREE.MathUtils.lerp(
           scene02CinematicVoidMaterial.opacity,
-          pathPresence * THREE.MathUtils.lerp(0.42, 0.72, pullEnergy),
+          pathPresence *
+            THREE.MathUtils.lerp(
+              portalPullCleanup.pathVoidMin ?? 0.52,
+              portalPullCleanup.pathVoidMax ?? 0.86,
+              pullEnergy
+            ),
           0.055
         );
 
         scene02PortalPullMaterial.opacity = THREE.MathUtils.lerp(
           scene02PortalPullMaterial.opacity,
-          pathPresence * THREE.MathUtils.lerp(0.10, 0.32, pathPulse),
+          pathPresence *
+            THREE.MathUtils.lerp(
+              portalPullCleanup.pathAuraMin ?? 0.045,
+              portalPullCleanup.pathAuraMax ?? 0.18,
+              pathPulse
+            ),
           0.05
         );
 
-        const pullScale = THREE.MathUtils.lerp(2.35, 3.95, pullEnergy);
+        const pullScale = THREE.MathUtils.lerp(
+          portalPullCleanup.pathAuraScaleNear ?? 2.05,
+          portalPullCleanup.pathAuraScaleFar ?? 3.15,
+          pullEnergy
+        );
         scene02PortalPullSprite.scale.set(
           pullScale * (1 + slowBreath * 0.03),
           pullScale * (1 + pathPulse * 0.025),
@@ -5412,7 +5465,11 @@ export function createTempleSanctuary() {
             pathPresence *
             fadeFront *
             fadeBack *
-            THREE.MathUtils.lerp(0.055, 0.30, pullEnergy);
+            THREE.MathUtils.lerp(
+              portalPullCleanup.pathRingMin ?? 0.03,
+              portalPullCleanup.pathRingMax ?? 0.18,
+              pullEnergy
+            );
 
           ring.material.opacity = THREE.MathUtils.lerp(
             ring.material.opacity,
@@ -5474,11 +5531,16 @@ export function createTempleSanctuary() {
 
         scene02PathStreakMaterial.opacity = THREE.MathUtils.lerp(
           scene02PathStreakMaterial.opacity,
-          pathPresence * THREE.MathUtils.lerp(0.12, 0.62, pullEnergy),
+          pathPresence *
+            THREE.MathUtils.lerp(
+              portalPullCleanup.pathStreakMin ?? 0.08,
+              portalPullCleanup.pathStreakMax ?? 0.48,
+              pullEnergy
+            ),
           0.07
         );
 
-        // SCENE02-VISUAL-02 — acceleration streak update.
+        // SCENE02-VISUAL-02 вЂ” acceleration streak update.
         // Stronger forward pull layer. Visual only. No camera movement.
         for (let i = 0; i < scene02PathAccelerationSeeds.length; i += 1) {
           const seed = scene02PathAccelerationSeeds[i];
@@ -5537,7 +5599,12 @@ export function createTempleSanctuary() {
 
         scene02PathAccelerationMaterial.opacity = THREE.MathUtils.lerp(
           scene02PathAccelerationMaterial.opacity,
-          pathPresence * THREE.MathUtils.lerp(0.035, 0.38, pullEnergy),
+          pathPresence *
+            THREE.MathUtils.lerp(
+              portalPullCleanup.pathAccelerationMin ?? 0.024,
+              portalPullCleanup.pathAccelerationMax ?? 0.30,
+              pullEnergy
+            ),
           0.075
         );
 
@@ -5573,7 +5640,12 @@ export function createTempleSanctuary() {
 
         scene02SideRailMaterial.opacity = THREE.MathUtils.lerp(
           scene02SideRailMaterial.opacity,
-          pathPresence * THREE.MathUtils.lerp(0.018, 0.16, pullEnergy),
+          pathPresence *
+            THREE.MathUtils.lerp(
+              portalPullCleanup.pathRailMin ?? 0.012,
+              portalPullCleanup.pathRailMax ?? 0.105,
+              pullEnergy
+            ),
           0.055
         );
 
@@ -5596,7 +5668,12 @@ export function createTempleSanctuary() {
           haze.scale.set(hazeScale, hazeScale, 1);
           haze.material.opacity = THREE.MathUtils.lerp(
             haze.material.opacity,
-            pathPresence * THREE.MathUtils.lerp(0.018, 0.07, slowBreath),
+            pathPresence *
+              THREE.MathUtils.lerp(
+                portalPullCleanup.pathHazeMin ?? 0.008,
+                portalPullCleanup.pathHazeMax ?? 0.038,
+                slowBreath
+              ),
             0.045
           );
         }
@@ -5642,7 +5719,12 @@ export function createTempleSanctuary() {
             scene02GuideLight.intensity,
             Math.max(
               scene02GuideLight.intensity,
-              pathPresence * THREE.MathUtils.lerp(0.55, 1.55, pathPulse)
+              pathPresence *
+                THREE.MathUtils.lerp(
+                  portalPullCleanup.pathGuideLightMin ?? 0.34,
+                  portalPullCleanup.pathGuideLightMax ?? 1.05,
+                  pathPulse
+                )
             ),
             0.05
           );
@@ -5656,7 +5738,12 @@ export function createTempleSanctuary() {
             scene02IsolationLight.intensity,
             Math.max(
               scene02IsolationLight.intensity,
-              pathPresence * THREE.MathUtils.lerp(0.35, 1.2, slowBreath)
+              pathPresence *
+                THREE.MathUtils.lerp(
+                  portalPullCleanup.pathIsolationLightMin ?? 0.26,
+                  portalPullCleanup.pathIsolationLightMax ?? 0.82,
+                  slowBreath
+                )
             ),
             0.05
           );
@@ -6193,3 +6280,13 @@ export function createTempleSanctuary() {
     },
   };
 }
+
+
+
+
+
+
+
+
+
+

@@ -424,9 +424,9 @@ export const templeSanctuaryPreset = {
     z: -2.02,
     y: 1.08,
 
-    radius: 1.22,
-    innerRadius: 0.62,
-    tube: 0.014,
+    radius: 1.18,
+    innerRadius: 0.72,
+    tube: 0.012,
 
     startAtRelease: 0.18,
     rampSpeed: 0.055,
@@ -435,18 +435,18 @@ export const templeSanctuaryPreset = {
     portalRotationSpeedInner: 0.11,
     portalPullStrength: 0.26,
     portalParticleCount: 220,
-    portalParticleOpacity: 0.34,
-    portalDepthOpacity: 0.26,
+    portalParticleOpacity: 0.22,
+    portalDepthOpacity: 0.38,
     portalBreathSpeed: 0.92,
 
-    coreOpacity: 0.36,
-    ringOpacity: 0.34,
-    innerRingOpacity: 0.22,
+    coreOpacity: 0.46,
+    ringOpacity: 0.24,
+    innerRingOpacity: 0.14,
 
     particleCount: 240,
     particleSize: 0.022,
-    particleOpacity: 0.42,
-    particleDepth: 3.2,
+    particleOpacity: 0.28,
+    particleDepth: 3.65,
 
     pulseSpeed: 1.35,
     rotationSpeed: 0.16,
@@ -454,6 +454,54 @@ export const templeSanctuaryPreset = {
 
     color: "#bcd6ff",
     coreColor: "#040914",
+  },
+
+  portalPullCleanup: {
+    enabled: true,
+
+    // DEMO-REAL-01C — Portal / Path Pull Cleanup.
+    // Makes the passage deeper and less technical:
+    // darker core, quieter big halos, cleaner pull field, less UI-like ring brightness.
+    portalRingMin: 0.16,
+    portalRingMax: 0.30,
+    innerRingMin: 0.08,
+    innerRingMax: 0.20,
+    coreMin: 0.24,
+    coreMax: 0.42,
+
+    passageCoreMin: 0.34,
+    passageCoreMax: 0.58,
+    passageParticleMin: 0.14,
+    passageParticleMax: 0.36,
+
+    pullOpacityMin: 0.16,
+    pullOpacityMax: 0.48,
+    pullApproachBoost: 0.08,
+
+    portalLightMin: 0.22,
+    portalLightMax: 0.82,
+    portalApproachLightBoost: 0.08,
+
+    pathVoidMin: 0.52,
+    pathVoidMax: 0.86,
+    pathAuraMin: 0.045,
+    pathAuraMax: 0.18,
+    pathAuraScaleNear: 2.05,
+    pathAuraScaleFar: 3.15,
+    pathRingMin: 0.03,
+    pathRingMax: 0.18,
+    pathStreakMin: 0.08,
+    pathStreakMax: 0.48,
+    pathAccelerationMin: 0.024,
+    pathAccelerationMax: 0.30,
+    pathRailMin: 0.012,
+    pathRailMax: 0.105,
+    pathHazeMin: 0.008,
+    pathHazeMax: 0.038,
+    pathGuideLightMin: 0.34,
+    pathGuideLightMax: 1.05,
+    pathIsolationLightMin: 0.26,
+    pathIsolationLightMax: 0.82,
   },
 
     processionalRows: {
