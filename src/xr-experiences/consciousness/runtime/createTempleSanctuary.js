@@ -2056,6 +2056,9 @@ export function createTempleSanctuary() {
   let scene02RuntimeContainerHoldTime = 0;
   let scene02RuntimeContainerPrepared = false;
   let scene02RuntimeContainerLevel = 0;
+  let scene02ContainerBindingContractHoldTime = 0;
+  let scene02ContainerBindingContractReady = false;
+  let scene02ContainerBindingContractLevel = 0;
 
   // SCENE02-BOOTSTRAP-02 - minimal local scene-state registry.
   // This is intentionally local to Scene 01 runtime for now.
@@ -2094,6 +2097,9 @@ export function createTempleSanctuary() {
       runtimeContainerPrepared: false,
       runtimeContainerLevel: 0,
       runtimeContainer: null,
+      containerBindingContractReady: false,
+      containerBindingContractLevel: 0,
+      containerBindingContract: null,
       isCurrent: false,
       isComplete: false,
     },
@@ -2122,6 +2128,9 @@ export function createTempleSanctuary() {
     scene02RuntimeContainerPreparedValue = false,
     scene02RuntimeContainerLevelValue = 0,
     scene02RuntimeContainer = null,
+    scene02ContainerBindingContractReadyValue = false,
+    scene02ContainerBindingContractLevelValue = 0,
+    scene02ContainerBindingContract = null,
   }) {
   localSceneStateRegistry.scene01.phase = scene01Phase;
   localSceneStateRegistry.scene01.isComplete = scene01Complete;
@@ -2159,6 +2168,15 @@ export function createTempleSanctuary() {
     localSceneStateRegistry.scene02.runtimeContainerLevel =
       scene02RuntimeContainerLevelValue;
     localSceneStateRegistry.scene02.runtimeContainer = scene02RuntimeContainer;
+
+    // SCENE02-BOOTSTRAP-07G — container binding contract registry binding.
+    // Contract only. Existing layers are not reparented in this step.
+    localSceneStateRegistry.scene02.containerBindingContractReady =
+      scene02ContainerBindingContractReadyValue;
+    localSceneStateRegistry.scene02.containerBindingContractLevel =
+      scene02ContainerBindingContractLevelValue;
+    localSceneStateRegistry.scene02.containerBindingContract =
+      scene02ContainerBindingContract;
 
     localSceneStateRegistry.scene02.isCurrent = scene02HandoffReady;
   }
@@ -2409,6 +2427,118 @@ export function createTempleSanctuary() {
     };
   }
 
+  // SCENE02-BOOTSTRAP-07G — Container Binding Contract Only.
+  // Contract only: no reparent, no room switch, no teleport, no visual movement.
+  function createScene02ContainerBindingContract({
+    ready = false,
+    level = 0,
+    phase = "not-ready",
+    container = null,
+    adapterObject = null,
+    currentLocalSceneId = "scene01-sanctuary",
+    targets = {},
+  }) {
+    const targetStates = {
+      scene02ShellRoot: Boolean(targets.scene02ShellRoot),
+      scene02IsolationRoot: Boolean(targets.scene02IsolationRoot),
+      preScene02Root: Boolean(targets.preScene02Root),
+      firstPassageRoot: Boolean(targets.firstPassageRoot),
+      passageRoot: Boolean(targets.passageRoot),
+    };
+
+    const requiredTargetsReady =
+      targetStates.scene02ShellRoot &&
+      targetStates.scene02IsolationRoot &&
+      targetStates.preScene02Root;
+
+    const containerPrepared = Boolean(container?.prepared);
+    const adapterReady = Boolean(adapterObject?.ready);
+    const isScene02Local = currentLocalSceneId === "scene02-path-into-unknown";
+
+    return {
+      version: "scene02-container-binding-contract-v0.1",
+
+      ready,
+      level,
+      phase,
+
+      sourceSceneId: "scene01-sanctuary",
+      targetSceneId: "scene02-path-into-unknown",
+
+      contractType: "container-binding-contract-only",
+      bindingMode: "future-reparent-contract",
+      containerName: "PathIntoUnknownRuntimeContainer",
+
+      canBindFutureChildren:
+        ready &&
+        containerPrepared &&
+        adapterReady &&
+        isScene02Local &&
+        requiredTargetsReady,
+
+      targetLayers: [
+        {
+          key: "scene02ShellRoot",
+          objectName: "PathIntoUnknownScene02Shell",
+          required: true,
+          exists: targetStates.scene02ShellRoot,
+          futureRole: "scene02-primary-shell",
+        },
+        {
+          key: "scene02IsolationRoot",
+          objectName: "PathIntoUnknownVisualIsolationLayer",
+          required: true,
+          exists: targetStates.scene02IsolationRoot,
+          futureRole: "scene02-visual-isolation",
+        },
+        {
+          key: "preScene02Root",
+          objectName: "TempleSanctuaryPreScene02Handoff",
+          required: true,
+          exists: targetStates.preScene02Root,
+          futureRole: "scene02-pre-handoff-bridge",
+        },
+        {
+          key: "firstPassageRoot",
+          objectName: "TempleSanctuaryFirstPassageState",
+          required: false,
+          exists: targetStates.firstPassageRoot,
+          futureRole: "scene01-to-scene02-passage-memory",
+        },
+        {
+          key: "passageRoot",
+          objectName: "TempleSanctuaryPassageAperture",
+          required: false,
+          exists: targetStates.passageRoot,
+          futureRole: "threshold-aperture-memory",
+        },
+      ],
+
+      readiness: {
+        containerPrepared,
+        adapterReady,
+        isScene02Local,
+        requiredTargetsReady,
+        currentLocalSceneId,
+      },
+
+      safety: {
+        contractOnly: true,
+        reparentsExistingLayersNow: false,
+        movesObjectsNow: false,
+        changesWorldTransformsNow: false,
+        performsTeleportNow: false,
+        performsRoomSwitchNow: false,
+        touchesSkyNow: false,
+        touchesXRRootNow: false,
+      },
+
+      nextStep: ready
+        ? "Ready for 07H: safe binding preflight or isolated child clone test."
+        : "Waiting for container, adapter, and Scene02 local state readiness.",
+    };
+  }
+
   root.userData.scene02RuntimeSwitch = createScene02RuntimeSwitchStub({
     armed: false,
     level: 0,
@@ -2431,6 +2561,22 @@ export function createTempleSanctuary() {
     runtimeSwitchStub: root.userData.scene02RuntimeSwitch ?? null,
     proximity: 0,
   });
+  root.userData.scene02ContainerBindingContract =
+    createScene02ContainerBindingContract({
+      ready: false,
+      level: 0,
+      phase: "not-ready",
+      container: root.userData.scene02RuntimeContainer ?? null,
+      adapterObject: root.userData.scene02AdapterObject ?? null,
+      currentLocalSceneId: root.userData.currentLocalSceneId ?? "scene01-sanctuary",
+      targets: {
+        scene02ShellRoot,
+        scene02IsolationRoot,
+        preScene02Root,
+        firstPassageRoot,
+        passageRoot,
+      },
+    });
 
   const chamberWorldPosition = new THREE.Vector3();
   const cameraWorldPosition = new THREE.Vector3();
@@ -4363,6 +4509,62 @@ export function createTempleSanctuary() {
 
       root.userData.scene02RuntimeContainer = scene02RuntimeContainerRoot.userData;
 
+      // SCENE02-BOOTSTRAP-07G — Container Binding Contract Only.
+      // Creates a contract for future binding/reparenting, but does NOT bind or reparent now.
+      const canPrepareScene02ContainerBindingContract =
+        scene02RuntimeContainerPrepared &&
+        scene02RuntimeContainerLevel > 0.72 &&
+        scene02AdapterObjectReady &&
+        scene02AdapterObjectLevel > 0.72 &&
+        root.userData.currentLocalSceneId === "scene02-path-into-unknown";
+
+      if (
+        canPrepareScene02ContainerBindingContract &&
+        !scene02ContainerBindingContractReady
+      ) {
+        scene02ContainerBindingContractHoldTime += deltaSeconds;
+
+        if (scene02ContainerBindingContractHoldTime > 0.55) {
+          scene02ContainerBindingContractReady = true;
+        }
+      } else if (!scene02ContainerBindingContractReady) {
+        scene02ContainerBindingContractHoldTime = Math.max(
+          0,
+          scene02ContainerBindingContractHoldTime - deltaSeconds * 0.75
+        );
+      }
+
+      const scene02ContainerBindingContractTarget =
+        scene02ContainerBindingContractReady ? 1 : 0;
+
+      scene02ContainerBindingContractLevel = THREE.MathUtils.lerp(
+        scene02ContainerBindingContractLevel,
+        scene02ContainerBindingContractTarget,
+        0.04
+      );
+
+      const scene02ContainerBindingContract = createScene02ContainerBindingContract({
+        ready: scene02ContainerBindingContractReady,
+        level: scene02ContainerBindingContractLevel,
+        phase: scene02ContainerBindingContractReady
+          ? "container-binding-contract-ready"
+          : canPrepareScene02ContainerBindingContract
+            ? "container-binding-contract-preparing"
+            : "not-ready",
+        container: root.userData.scene02RuntimeContainer ?? null,
+        adapterObject: root.userData.scene02AdapterObject ?? null,
+        currentLocalSceneId: root.userData.currentLocalSceneId ?? "scene01-sanctuary",
+        targets: {
+          scene02ShellRoot,
+          scene02IsolationRoot,
+          preScene02Root,
+          firstPassageRoot,
+          passageRoot,
+        },
+      });
+
+      root.userData.scene02ContainerBindingContract = scene02ContainerBindingContract;
+
       // SCENE02-BOOTSTRAP-02 - derive minimal scene02 state.
       // Still no navigation, no teleport, no room switch.
       const scene01TransitionPhase =
@@ -4437,6 +4639,12 @@ export function createTempleSanctuary() {
         scene02RuntimeContainerPreparedValue: scene02RuntimeContainerPrepared,
         scene02RuntimeContainerLevelValue: scene02RuntimeContainerLevel,
         scene02RuntimeContainer: root.userData.scene02RuntimeContainer ?? null,
+        scene02ContainerBindingContractReadyValue:
+          scene02ContainerBindingContractReady,
+        scene02ContainerBindingContractLevelValue:
+          scene02ContainerBindingContractLevel,
+        scene02ContainerBindingContract:
+          root.userData.scene02ContainerBindingContract ?? null,
       });
 
       // Public readiness state for future real Scene 02 transition.
@@ -4491,6 +4699,12 @@ export function createTempleSanctuary() {
         scene02RuntimeContainerLevel,
         scene02RuntimeContainerPhase:
           root.userData.scene02RuntimeContainer?.phase ?? "not-ready",
+        scene02ContainerBindingContractReady,
+        scene02ContainerBindingContractLevel,
+        scene02ContainerBindingContractPhase:
+          root.userData.scene02ContainerBindingContract?.phase ?? "not-ready",
+        scene02ContainerBindingCanBindFutureChildren:
+          root.userData.scene02ContainerBindingContract?.canBindFutureChildren ?? false,
         hold: firstPassageHoldTime,
         readiness: transitionReadinessLevel,
         proximity: transitionZoneLevel,
@@ -4607,6 +4821,10 @@ export function createTempleSanctuary() {
         scene02RuntimeContainerPrepared: false,
         scene02RuntimeContainerLevel: 0,
         scene02RuntimeContainerPhase: "not-ready",
+        scene02ContainerBindingContractReady: false,
+        scene02ContainerBindingContractLevel: 0,
+        scene02ContainerBindingContractPhase: "not-ready",
+        scene02ContainerBindingCanBindFutureChildren: false,
         hold: 0,
         readiness: 0,
         proximity: 0,
@@ -4727,6 +4945,24 @@ export function createTempleSanctuary() {
           touchesXRRootNow: false,
         },
       };
+    },
+    getScene02ContainerBindingContract() {
+      return root.userData.scene02ContainerBindingContract ?? createScene02ContainerBindingContract({
+        ready: false,
+        level: 0,
+        phase: "not-ready",
+        container: root.userData.scene02RuntimeContainer ?? null,
+        adapterObject: root.userData.scene02AdapterObject ?? null,
+        currentLocalSceneId:
+          root.userData.currentLocalSceneId ?? "scene01-sanctuary",
+        targets: {
+          scene02ShellRoot,
+          scene02IsolationRoot,
+          preScene02Root,
+          firstPassageRoot,
+          passageRoot,
+        },
+      });
     },
     getTransformationCueLevel() {
       return transformationCueLevel;
