@@ -1784,6 +1784,223 @@ export function createTempleSanctuary() {
       boundLayerKeys: [],
     });
 
+  // SCENE02-VISUAL-01 — Cinematic Path Into the Unknown visual layer.
+  // Local authored visual proof only: no sky, no XRRoot, no teleport, no hard room switch.
+  function createScene02CinematicSoftDiscTexture({
+    size = 128,
+    inner = "rgba(190, 230, 255, 0.95)",
+    mid = "rgba(100, 170, 255, 0.18)",
+    outer = "rgba(20, 40, 90, 0)",
+  } = {}) {
+    if (typeof document === "undefined") return null;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+
+    const context = canvas.getContext("2d");
+    const center = size * 0.5;
+    const gradient = context.createRadialGradient(
+      center,
+      center,
+      0,
+      center,
+      center,
+      center
+    );
+
+    gradient.addColorStop(0, inner);
+    gradient.addColorStop(0.28, mid);
+    gradient.addColorStop(1, outer);
+
+    context.clearRect(0, 0, size, size);
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, size, size);
+
+    const texture = new THREE.CanvasTexture(canvas);
+
+    if ("SRGBColorSpace" in THREE) {
+      texture.colorSpace = THREE.SRGBColorSpace;
+    }
+
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+
+    return texture;
+  }
+
+  const scene02CinematicPathRoot = new THREE.Group();
+  scene02CinematicPathRoot.name = "Scene02CinematicPathIntoUnknown";
+  scene02CinematicPathRoot.visible = false;
+  scene02CinematicPathRoot.position.set(0, 0, -1.05);
+  scene02CinematicPathRoot.renderOrder = 80;
+  scene02RuntimeContainerRoot.add(scene02CinematicPathRoot);
+
+  const scene02CinematicVoidMaterial = new THREE.MeshBasicMaterial({
+    color: 0x01030a,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    side: THREE.DoubleSide,
+  });
+
+  const scene02CinematicVoid = new THREE.Mesh(
+    new THREE.CircleGeometry(1.85, 128),
+    scene02CinematicVoidMaterial
+  );
+  scene02CinematicVoid.name = "Scene02CinematicVoidCore";
+  scene02CinematicVoid.position.set(0, 0, -5.45);
+  scene02CinematicVoid.renderOrder = 82;
+  scene02CinematicPathRoot.add(scene02CinematicVoid);
+
+  const scene02SoftDiscTexture = createScene02CinematicSoftDiscTexture({
+    inner: "rgba(210, 240, 255, 0.9)",
+    mid: "rgba(80, 155, 255, 0.16)",
+    outer: "rgba(10, 25, 70, 0)",
+  });
+
+  const scene02PortalPullMaterial = new THREE.SpriteMaterial({
+    map: scene02SoftDiscTexture,
+    color: 0x8fc8ff,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+  });
+
+  const scene02PortalPullSprite = new THREE.Sprite(scene02PortalPullMaterial);
+  scene02PortalPullSprite.name = "Scene02PortalPullAura";
+  scene02PortalPullSprite.position.set(0, 0, -2.2);
+  scene02PortalPullSprite.scale.set(3.4, 3.4, 1);
+  scene02PortalPullSprite.renderOrder = 81;
+  scene02CinematicPathRoot.add(scene02PortalPullSprite);
+
+  const scene02TunnelRings = [];
+  const scene02TunnelRingGeometry = new THREE.TorusGeometry(1, 0.006, 8, 128);
+
+  for (let i = 0; i < 26; i += 1) {
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x8edaff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+    });
+
+    material.color.setHSL(0.56 + (i % 5) * 0.025, 0.62, 0.68);
+
+    const ring = new THREE.Mesh(scene02TunnelRingGeometry, material);
+    ring.name = `Scene02DepthRing_${String(i).padStart(2, "0")}`;
+    ring.renderOrder = 83 + i;
+    ring.userData.depthSeed = i / 26;
+    ring.userData.rotationSeed = i * 0.43;
+    ring.userData.rotationSpeed = 0.035 + (i % 4) * 0.013;
+    ring.position.set(0, 0, -0.8 - i * 0.28);
+    ring.scale.setScalar(0.55 + i * 0.045);
+
+    scene02TunnelRings.push(ring);
+    scene02CinematicPathRoot.add(ring);
+  }
+
+  const scene02PathStreakCount = 128;
+  const scene02PathStreakPositions = new Float32Array(
+    scene02PathStreakCount * 2 * 3
+  );
+
+  const scene02PathStreakSeeds = Array.from(
+    { length: scene02PathStreakCount },
+    (_, index) => {
+      const angle = index * 2.399963 + (index % 7) * 0.19;
+      return {
+        angle,
+        radius: 0.28 + (((index * 37) % 100) / 100) * 1.35,
+        z: -7.4 + (((index * 53) % 100) / 100) * 7.2,
+        speed: 0.62 + (((index * 29) % 100) / 100) * 1.45,
+        length: 0.16 + (((index * 17) % 100) / 100) * 0.42,
+        twist: index % 2 === 0 ? 1 : -1,
+      };
+    }
+  );
+
+  const scene02PathStreakGeometry = new THREE.BufferGeometry();
+  scene02PathStreakGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(scene02PathStreakPositions, 3)
+  );
+
+  const scene02PathStreakMaterial = new THREE.LineBasicMaterial({
+    color: 0xb9eaff,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+  });
+
+  const scene02PathStreakLines = new THREE.LineSegments(
+    scene02PathStreakGeometry,
+    scene02PathStreakMaterial
+  );
+  scene02PathStreakLines.name = "Scene02ForwardStreakField";
+  scene02PathStreakLines.renderOrder = 90;
+  scene02CinematicPathRoot.add(scene02PathStreakLines);
+
+  const scene02HazeSprites = [];
+  const scene02HazeTexture = createScene02CinematicSoftDiscTexture({
+    size: 96,
+    inner: "rgba(170, 220, 255, 0.42)",
+    mid: "rgba(80, 130, 240, 0.10)",
+    outer: "rgba(0, 0, 20, 0)",
+  });
+
+  for (let i = 0; i < 10; i += 1) {
+    const hazeMaterial = new THREE.SpriteMaterial({
+      map: scene02HazeTexture,
+      color: 0x6aa8ff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+    });
+
+    const haze = new THREE.Sprite(hazeMaterial);
+    haze.name = `Scene02LocalBreathHaze_${String(i).padStart(2, "0")}`;
+    haze.position.set(
+      Math.cos(i * 1.71) * (0.35 + (i % 4) * 0.18),
+      Math.sin(i * 1.37) * (0.22 + (i % 5) * 0.11),
+      -1.4 - i * 0.46
+    );
+    const hazeScale = 0.75 + (i % 5) * 0.24;
+    haze.scale.set(hazeScale, hazeScale, 1);
+    haze.renderOrder = 78;
+    haze.userData.baseX = haze.position.x;
+    haze.userData.baseY = haze.position.y;
+    haze.userData.baseZ = haze.position.z;
+    haze.userData.phase = i * 0.73;
+
+    scene02HazeSprites.push(haze);
+    scene02CinematicPathRoot.add(haze);
+  }
+
+  root.userData.scene02CinematicPath = {
+    version: "scene02-cinematic-path-v0.1",
+    active: false,
+    level: 0,
+    mode: "visual-layer-only",
+    safety: {
+      touchesSkyNow: false,
+      touchesXRRootNow: false,
+      performsTeleportNow: false,
+      performsRoomSwitchNow: false,
+    },
+  };
+
   // SCENE02-BOOTSTRAP-03 - Scene02 Visual Isolation Layer.
   // This starts separating Scene 02 as its own visual state.
   // No teleport, no room switch, no sky/global runtime changes.
@@ -4547,35 +4764,287 @@ export function createTempleSanctuary() {
         actualBindingComplete: scene02ContainerActualBindingComplete,
       });
 
-      // Very restrained visual confirmation that Scene02 is now container-bound.
-      if (scene02ContainerActualBindingComplete) {
-        const boundPresence = THREE.MathUtils.smoothstep(
-          scene02ContainerActualBindingLevel,
-          0.04,
-          1.0
+      // SCENE02-VISUAL-01 — Cinematic Path Into the Unknown Pass.
+      // Bold but controlled: visible tunnel/depth/pull layer only.
+      // No sky, no XRRoot, no teleport, no hard room switch.
+      {
+        const rawPathPresence = Math.max(
+          scene02SemanticVisualPriorityLevel ?? 0,
+          scene02ContainerActualBindingLevel ?? 0,
+          scene02RuntimeContainerLevel ?? 0
         );
-        const boundBreath = 0.5 + 0.5 * Math.sin(t * 0.18);
 
-        scene02StreamMaterial.opacity +=
-          boundPresence * THREE.MathUtils.lerp(0.06, 0.18, boundBreath);
+        const pathPresence = scene02ContainerActualBindingComplete
+          ? THREE.MathUtils.smoothstep(rawPathPresence, 0.04, 0.92)
+          : THREE.MathUtils.smoothstep(
+              scene02SemanticVisualPriorityLevel ?? 0,
+              0.28,
+              1.0
+            ) * 0.56;
 
-        scene02IsolationStreamMaterial.opacity +=
-          boundPresence * THREE.MathUtils.lerp(0.04, 0.14, boundBreath);
+        const pathPulse = 0.5 + 0.5 * Math.sin(t * 0.72);
+        const slowBreath = 0.5 + 0.5 * Math.sin(t * 0.19);
+        const pullEnergy = pathPresence * THREE.MathUtils.lerp(0.72, 1.25, pathPulse);
 
-        scene02GuideLight.intensity +=
-          boundPresence * THREE.MathUtils.lerp(0.08, 0.28, boundBreath);
+        scene02CinematicPathRoot.visible = pathPresence > 0.012;
+        scene02CinematicPathRoot.rotation.z =
+          -t * THREE.MathUtils.lerp(0.025, 0.145, pullEnergy);
 
-        scene02IsolationLight.intensity +=
-          boundPresence * THREE.MathUtils.lerp(0.06, 0.22, boundBreath);
+        scene02CinematicPathRoot.position.z = THREE.MathUtils.lerp(
+          scene02CinematicPathRoot.position.z,
+          -1.05 - pullEnergy * 0.26,
+          0.045
+        );
 
-        // Old prompt becomes less important after actual binding.
-        if (passagePromptRoot?.visible) {
-          passagePromptSprite.material.opacity *= THREE.MathUtils.lerp(
-            1.0,
-            0.18,
-            boundPresence
+        const pathScale = 0.92 + pullEnergy * 0.18 + slowBreath * 0.018;
+        scene02CinematicPathRoot.scale.set(pathScale, pathScale, 1);
+
+        scene02CinematicVoidMaterial.opacity = THREE.MathUtils.lerp(
+          scene02CinematicVoidMaterial.opacity,
+          pathPresence * THREE.MathUtils.lerp(0.42, 0.72, pullEnergy),
+          0.055
+        );
+
+        scene02PortalPullMaterial.opacity = THREE.MathUtils.lerp(
+          scene02PortalPullMaterial.opacity,
+          pathPresence * THREE.MathUtils.lerp(0.10, 0.32, pathPulse),
+          0.05
+        );
+
+        const pullScale = THREE.MathUtils.lerp(2.35, 3.95, pullEnergy);
+        scene02PortalPullSprite.scale.set(
+          pullScale * (1 + slowBreath * 0.03),
+          pullScale * (1 + pathPulse * 0.025),
+          1
+        );
+
+        for (const ring of scene02TunnelRings) {
+          const loopDepth =
+            (ring.userData.depthSeed + t * (0.022 + pullEnergy * 0.075)) % 1;
+
+          const radius = THREE.MathUtils.lerp(0.52, 1.95, loopDepth);
+          const z = THREE.MathUtils.lerp(-0.74, -7.6, loopDepth);
+
+          ring.position.z = z;
+          ring.scale.setScalar(
+            radius * (1 + Math.sin(t * 0.31 + loopDepth * 8) * 0.018)
+          );
+          ring.rotation.z =
+            ring.userData.rotationSeed +
+            t * ring.userData.rotationSpeed * THREE.MathUtils.lerp(1.0, 5.2, pullEnergy);
+
+          const fadeFront = THREE.MathUtils.smoothstep(loopDepth, 0.02, 0.18);
+          const fadeBack = 1 - THREE.MathUtils.smoothstep(loopDepth, 0.78, 1.0);
+          const ringOpacity =
+            pathPresence *
+            fadeFront *
+            fadeBack *
+            THREE.MathUtils.lerp(0.045, 0.22, pullEnergy);
+
+          ring.material.opacity = THREE.MathUtils.lerp(
+            ring.material.opacity,
+            ringOpacity,
+            0.06
           );
         }
+
+        for (let i = 0; i < scene02PathStreakSeeds.length; i += 1) {
+          const seed = scene02PathStreakSeeds[i];
+
+          seed.z +=
+            deltaSeconds *
+            seed.speed *
+            THREE.MathUtils.lerp(0.28, 3.65, pullEnergy);
+
+          if (seed.z > 0.25) {
+            seed.z = -7.6 - (((i * 31) % 100) / 100) * 1.4;
+            seed.radius = 0.28 + (((i * 37 + Math.floor(t * 10)) % 100) / 100) * 1.36;
+          }
+
+          const normalizedDepth = THREE.MathUtils.clamp((seed.z + 7.8) / 8.05, 0, 1);
+          const perspectiveRadius =
+            seed.radius * THREE.MathUtils.lerp(0.34, 1.82, normalizedDepth);
+          const twist =
+            seed.angle +
+            seed.twist * (t * (0.045 + pullEnergy * 0.18) + seed.z * 0.18);
+
+          const x1 = Math.cos(twist) * perspectiveRadius;
+          const y1 = Math.sin(twist) * perspectiveRadius * 0.72;
+
+          const tailDepth = Math.max(
+            -8.4,
+            seed.z - seed.length * (1.0 + pullEnergy * 1.8)
+          );
+          const tailRadius =
+            seed.radius *
+            THREE.MathUtils.lerp(
+              0.30,
+              1.64,
+              THREE.MathUtils.clamp((tailDepth + 7.8) / 8.05, 0, 1)
+            );
+          const tailTwist = twist - seed.twist * 0.035;
+
+          const x2 = Math.cos(tailTwist) * tailRadius;
+          const y2 = Math.sin(tailTwist) * tailRadius * 0.72;
+
+          const p = i * 6;
+          scene02PathStreakPositions[p + 0] = x1;
+          scene02PathStreakPositions[p + 1] = y1;
+          scene02PathStreakPositions[p + 2] = seed.z;
+
+          scene02PathStreakPositions[p + 3] = x2;
+          scene02PathStreakPositions[p + 4] = y2;
+          scene02PathStreakPositions[p + 5] = tailDepth;
+        }
+
+        scene02PathStreakGeometry.getAttribute("position").needsUpdate = true;
+
+        scene02PathStreakMaterial.opacity = THREE.MathUtils.lerp(
+          scene02PathStreakMaterial.opacity,
+          pathPresence * THREE.MathUtils.lerp(0.10, 0.46, pullEnergy),
+          0.07
+        );
+
+        for (const haze of scene02HazeSprites) {
+          const phase = haze.userData.phase;
+          const drift = Math.sin(t * 0.16 + phase);
+
+          haze.position.x =
+            haze.userData.baseX +
+            Math.cos(t * 0.11 + phase) * 0.045 * pathPresence;
+          haze.position.y = haze.userData.baseY + drift * 0.035 * pathPresence;
+          haze.position.z =
+            haze.userData.baseZ + Math.sin(t * 0.09 + phase) * 0.08 * pathPresence;
+
+          const hazeScale =
+            0.72 +
+            (phase % 1.4) * 0.28 +
+            pathPresence * THREE.MathUtils.lerp(0.20, 0.55, slowBreath);
+
+          haze.scale.set(hazeScale, hazeScale, 1);
+          haze.material.opacity = THREE.MathUtils.lerp(
+            haze.material.opacity,
+            pathPresence * THREE.MathUtils.lerp(0.018, 0.07, slowBreath),
+            0.045
+          );
+        }
+
+        if (typeof scene02StreamMaterial !== "undefined" && scene02StreamMaterial) {
+          scene02StreamMaterial.opacity = THREE.MathUtils.lerp(
+            scene02StreamMaterial.opacity,
+            Math.max(
+              scene02StreamMaterial.opacity,
+              pathPresence * THREE.MathUtils.lerp(0.22, 0.62, pathPulse)
+            ),
+            0.055
+          );
+        }
+
+        if (
+          typeof scene02IsolationStreamMaterial !== "undefined" &&
+          scene02IsolationStreamMaterial
+        ) {
+          scene02IsolationStreamMaterial.opacity = THREE.MathUtils.lerp(
+            scene02IsolationStreamMaterial.opacity,
+            Math.max(
+              scene02IsolationStreamMaterial.opacity,
+              pathPresence * THREE.MathUtils.lerp(0.16, 0.48, slowBreath)
+            ),
+            0.055
+          );
+        }
+
+        if (typeof scene02VoidCoreMaterial !== "undefined" && scene02VoidCoreMaterial) {
+          scene02VoidCoreMaterial.opacity = THREE.MathUtils.lerp(
+            scene02VoidCoreMaterial.opacity,
+            Math.max(
+              scene02VoidCoreMaterial.opacity,
+              pathPresence * THREE.MathUtils.lerp(0.38, 0.72, pathPulse)
+            ),
+            0.05
+          );
+        }
+
+        if (typeof scene02GuideLight !== "undefined" && scene02GuideLight) {
+          scene02GuideLight.intensity = THREE.MathUtils.lerp(
+            scene02GuideLight.intensity,
+            Math.max(
+              scene02GuideLight.intensity,
+              pathPresence * THREE.MathUtils.lerp(0.55, 1.55, pathPulse)
+            ),
+            0.05
+          );
+        }
+
+        if (
+          typeof scene02IsolationLight !== "undefined" &&
+          scene02IsolationLight
+        ) {
+          scene02IsolationLight.intensity = THREE.MathUtils.lerp(
+            scene02IsolationLight.intensity,
+            Math.max(
+              scene02IsolationLight.intensity,
+              pathPresence * THREE.MathUtils.lerp(0.35, 1.2, slowBreath)
+            ),
+            0.05
+          );
+        }
+
+        if (
+          typeof preScene02StreamMaterial !== "undefined" &&
+          preScene02StreamMaterial
+        ) {
+          preScene02StreamMaterial.opacity = THREE.MathUtils.lerp(
+            preScene02StreamMaterial.opacity,
+            Math.max(
+              preScene02StreamMaterial.opacity,
+              pathPresence * THREE.MathUtils.lerp(0.12, 0.32, pathPulse)
+            ),
+            0.045
+          );
+        }
+
+        if (
+          typeof passagePromptSprite !== "undefined" &&
+          passagePromptSprite?.material
+        ) {
+          passagePromptSprite.material.opacity *= THREE.MathUtils.lerp(
+            1.0,
+            0.16,
+            pathPresence
+          );
+        }
+
+        if (
+          typeof transitionReadinessRing !== "undefined" &&
+          transitionReadinessRing?.material
+        ) {
+          transitionReadinessRing.material.opacity *= THREE.MathUtils.lerp(
+            1.0,
+            0.22,
+            pathPresence
+          );
+        }
+
+        root.userData.scene02CinematicPath = {
+          version: "scene02-cinematic-path-v0.1",
+          active: pathPresence > 0.012,
+          level: pathPresence,
+          pullEnergy,
+          mode: "visual-layer-only",
+          visualStack: {
+            voidCore: true,
+            rotatingDepthRings: true,
+            forwardStreaks: true,
+            localHaze: true,
+          },
+          safety: {
+            touchesSkyNow: false,
+            touchesXRRootNow: false,
+            performsTeleportNow: false,
+            performsRoomSwitchNow: false,
+          },
+        };
       }
 
       // SCENE02-BOOTSTRAP-02 - derive minimal scene02 state.
