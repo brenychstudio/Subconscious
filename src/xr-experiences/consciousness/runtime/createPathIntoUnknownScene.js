@@ -1,3 +1,234 @@
+export function createScene02SwitchContract({
+  ready = false,
+  level = 0,
+  phase = "locked",
+  proximity = 0,
+  scene02ShellValue = 0,
+  scene02VisualIsolationValue = 0,
+}) {
+  return {
+    version: "scene02-switch-contract-v0.1",
+
+    ready,
+    level,
+    phase,
+
+    sourceSceneId: "scene01-sanctuary",
+    sourceTitle: "Sanctuary / Membrane Chamber",
+
+    targetSceneId: "scene02-path-into-unknown",
+    targetTitle: "Path Into the Unknown",
+
+    transitionType: "soft-passage",
+    switchMode: "future-runtime-switch",
+    entryAnchor: "path-threshold-forward",
+    entryDirection: "forward-through-portal",
+
+    requirements: {
+      thresholdOpen: true,
+      firstPassageTriggered: true,
+      enterReady: true,
+      preScene02HandoffTriggered: true,
+      scene02ShellActivated: true,
+      scene02VisualIsolationTriggered: true,
+      viewerInTransitionZone: proximity > 0.72,
+    },
+
+    runtime: {
+      scene02ShellLevel: scene02ShellValue,
+      scene02VisualIsolationLevel: scene02VisualIsolationValue,
+      proximity,
+    },
+
+    nextStep: ready
+      ? "Scene02 runtime switch can be implemented by a future handoff adapter."
+      : "Scene02 visual shell is preparing; runtime switch is not ready yet.",
+
+    performsNavigationNow: false,
+    performsTeleportNow: false,
+    touchesSkyNow: false,
+  };
+}
+
+export function createScene02RuntimeSwitchStub({
+  armed = false,
+  level = 0,
+  phase = "not-ready",
+  proximity = 0,
+  switchContract = null,
+}) {
+  const contractReady = Boolean(switchContract?.ready);
+
+  return {
+    version: "scene02-runtime-switch-stub-v0.1",
+
+    armed,
+    level,
+    phase,
+
+    sourceSceneId: "scene01-sanctuary",
+    targetSceneId: "scene02-path-into-unknown",
+
+    switchMode: "stub-only",
+    transitionType: "soft-passage",
+    entryAnchor: "path-threshold-forward",
+    entryDirection: "forward-through-portal",
+
+    contractReady,
+    canBeImplementedByFutureAdapter:
+      armed && contractReady && proximity > 0.72,
+
+    futureAdapterContract: {
+      shouldFadeScene01: true,
+      shouldKeepSkyLayerAlive: true,
+      shouldPreserveUserForwardDirection: true,
+      shouldEnterScene02AtAnchor: "path-threshold-forward",
+      shouldUseSoftPassageTransition: true,
+    },
+
+    runtime: {
+      proximity,
+      switchContractLevel: switchContract?.level ?? 0,
+      switchContractPhase: switchContract?.phase ?? "not-ready",
+    },
+
+    performsNavigationNow: false,
+    performsTeleportNow: false,
+    performsRoomSwitchNow: false,
+    touchesSkyNow: false,
+
+    nextStep: armed
+      ? "Safe runtime switch stub is armed. Future adapter can implement actual Scene02 switch."
+      : "Runtime switch stub is waiting for Scene02 switch contract readiness.",
+  };
+}
+
+export function createScene02RuntimeDiagnostic({
+  transitionState = null,
+  switchContract = null,
+  runtimeSwitchStub = null,
+  proximity = 0,
+}) {
+  const contractReady = Boolean(switchContract?.ready);
+  const stubArmed = Boolean(runtimeSwitchStub?.armed);
+  const stubLevel = runtimeSwitchStub?.level ?? 0;
+
+  return {
+    version: "scene02-runtime-diagnostic-v0.1",
+
+    reachedSwitchContract: contractReady,
+    reachedRuntimeSwitchStub: stubArmed,
+    stubLevel,
+    proximity,
+
+    phase: stubArmed
+      ? "runtime-switch-stub-armed"
+      : contractReady
+        ? "switch-contract-ready"
+        : transitionState?.phase ?? "not-ready",
+
+    safeForFutureAdapter:
+      contractReady && stubArmed && stubLevel > 0.72 && proximity > 0.68,
+
+    confirms: {
+      noNavigation: true,
+      noTeleport: true,
+      noRoomSwitch: true,
+      noSkyMutation: true,
+      noXRRootMutation: true,
+      diagnosticOnly: true,
+    },
+
+    observedTransition: {
+      scene02ShellActivated: Boolean(transitionState?.scene02ShellActivated),
+      scene02ShellReady: Boolean(transitionState?.scene02ShellReady),
+      scene02VisualIsolationReady: Boolean(
+        transitionState?.scene02VisualIsolationReady
+      ),
+      scene02SwitchContractReady: Boolean(
+        transitionState?.scene02SwitchContractReady
+      ),
+      scene02RuntimeSwitchStubArmed: stubArmed,
+      phase: transitionState?.phase ?? "unknown",
+    },
+
+    nextStep: contractReady && stubArmed
+      ? "Ready for adapter promotion from Path Into the Unknown runtime module."
+      : "Continue validating pre-adapter state before adding adapter logic.",
+  };
+}
+
+export function createScene02AdapterObject({
+  ready = false,
+  level = 0,
+  phase = "not-ready",
+  diagnostic = null,
+  switchContract = null,
+  runtimeSwitchStub = null,
+  proximity = 0,
+}) {
+  const diagnosticSafe = Boolean(diagnostic?.safeForFutureAdapter);
+  const contractReady = Boolean(switchContract?.ready);
+  const stubArmed = Boolean(runtimeSwitchStub?.armed);
+
+  return {
+    version: "scene02-adapter-object-v0.1",
+
+    type: "adapter-object-only",
+    ready,
+    level,
+    phase,
+
+    sourceSceneId: "scene01-sanctuary",
+    targetSceneId: "scene02-path-into-unknown",
+
+    adapterMode: "descriptor-only",
+    transitionType: "soft-passage",
+    entryAnchor: "path-threshold-forward",
+    entryDirection: "forward-through-portal",
+
+    gates: {
+      diagnosticSafe,
+      contractReady,
+      runtimeSwitchStubArmed: stubArmed,
+      proximityReady: proximity > 0.68,
+    },
+
+    canPromoteToAdapterDraft:
+      ready && diagnosticSafe && contractReady && stubArmed && proximity > 0.68,
+
+    runtime: {
+      proximity,
+      diagnosticPhase: diagnostic?.phase ?? "unknown",
+      switchContractPhase: switchContract?.phase ?? "unknown",
+      runtimeSwitchStubPhase: runtimeSwitchStub?.phase ?? "unknown",
+      runtimeSwitchStubLevel: runtimeSwitchStub?.level ?? 0,
+    },
+
+    safety: {
+      mutatesRegistryNow: false,
+      mutatesCurrentLocalSceneIdNow: false,
+      performsNavigationNow: false,
+      performsTeleportNow: false,
+      performsRoomSwitchNow: false,
+      touchesSkyNow: false,
+      touchesXRRootNow: false,
+      visualChangesNow: false,
+    },
+
+    nextStep: ready
+      ? "Ready for registry binding or adapter promotion."
+      : "Waiting for diagnostic/runtime-switch readiness.",
+  };
+}
+
+const EXTERNALIZED_STATE_HELPERS = [
+  "createScene02SwitchContract",
+  "createScene02RuntimeSwitchStub",
+  "createScene02RuntimeDiagnostic",
+  "createScene02AdapterObject",
+];
+
 export function createPathIntoUnknownSceneRuntime({
   containerRoot = null,
   sourceSceneId = "scene01-sanctuary",
@@ -5,7 +236,7 @@ export function createPathIntoUnknownSceneRuntime({
   title = "Path Into the Unknown",
 } = {}) {
   const runtimeState = {
-    version: "path-into-unknown-runtime-v0.1",
+    version: "path-into-unknown-runtime-v0.2",
 
     sceneId,
     title,
@@ -33,6 +264,10 @@ export function createPathIntoUnknownSceneRuntime({
       "scene02IsolationRoot",
       "preScene02Root",
     ],
+
+    externalizedHelpers: EXTERNALIZED_STATE_HELPERS,
+    externalizedHelpersReady: true,
+    helperSource: "createPathIntoUnknownScene.js",
 
     safety: {
       runtimeShellOnly: true,
@@ -76,7 +311,7 @@ export function createPathIntoUnknownSceneRuntime({
         runtimeState.containerBound &&
         runtimeState.currentLocalSceneId === sceneId,
       nextStep: runtimeState.containerBound
-        ? "Move Scene02 state helpers into this module in SCENE02-RUNTIME-02."
+        ? "Move Scene02 visual construction into this module in a later extraction pass."
         : "Wait for container binding before moving visual/runtime logic.",
     };
   }
