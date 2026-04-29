@@ -16,6 +16,7 @@ import {
   createScene02VisualResponseState as createScene02VisualResponseStateFromPathScene,
   createScene02RuntimeContainerState as createScene02RuntimeContainerStateFromPathScene,
 } from "./createPathIntoUnknownScene.js";
+import { createSanctuaryAtmosphereDepthLayer } from "./createSanctuaryAtmosphereDepthLayer.js";
 
 function disposeMaterial(material) {
   if (!material) return;
@@ -858,6 +859,14 @@ export function createTempleSanctuary() {
   const chamberDissolve = preset.chamberDissolve ?? {};
   const atmospherePreset = preset.atmosphere;
   let atmosphere = null;
+  const atmosphereDepthLayer = createSanctuaryAtmosphereDepthLayer(
+    THREE,
+    preset.atmosphereDepth ?? {}
+  );
+
+  if ((preset.atmosphereDepth ?? {}).enabled !== false) {
+    root.add(atmosphereDepthLayer.root);
+  }
 
   if (atmospherePreset?.enabled) {
     const atmosphereRoot = new THREE.Group();
@@ -3690,6 +3699,17 @@ export function createTempleSanctuary() {
 
       chamberRoot.visible = dissolveAmount < (chamberDissolve.hideAt ?? 0.992);
 
+      atmosphereDepthLayer.update({
+        elapsed: t,
+        deltaSeconds,
+        proximityLevel,
+        ritualChargeLevel,
+        transformationCueLevel,
+        openingStateLevel,
+        releaseAmount,
+        firstFrameAmount,
+      });
+
       for (const entry of chamberVisualEntries) {
         const mat = entry.material;
         if (!mat) continue;
@@ -6271,6 +6291,7 @@ export function createTempleSanctuary() {
       activationPeakLevel = 0;
     },
     dispose() {
+      atmosphereDepthLayer.dispose?.();
       softPointTexture?.dispose?.();
       root.traverse((obj) => {
         if (obj.geometry) obj.geometry.dispose?.();

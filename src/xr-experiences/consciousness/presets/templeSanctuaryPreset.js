@@ -159,6 +159,62 @@ export const templeSanctuaryPreset = {
     thresholdLightBoost: 0.18,
   },
 
+  atmosphereDepth: {
+    enabled: true,
+
+    // DEMO-REAL-04 - Sanctuary Atmosphere / Fog Depth Pass.
+    // Premium dark depth atmosphere: floor glow, vertical haze, soft veils, soft dust.
+    color: "#9fbaff",
+
+    basePresence: 0.72,
+    firstFrameBoost: 0.16,
+    proximityBoost: 0.22,
+    chargeBoost: 0.08,
+    transformationBoost: 0.12,
+    openingBoost: 0.28,
+    releaseBoost: 0.14,
+
+    floorSize: 16,
+    floorY: 0.018,
+    floorZ: 1.6,
+    floorOpacity: 0.072,
+
+    hazeRadius: 7.2,
+    hazeHeight: 6.6,
+    hazeY: 2.95,
+    hazeZ: 0.8,
+    hazeOpacity: 0.06,
+    hazeRotationSpeed: 0.006,
+    hazeScaleAmp: 0.018,
+
+    breathSpeed: 0.28,
+    deepBreathSpeed: 0.12,
+    rootDrift: 0.002,
+
+    veilDriftX: 0.06,
+    veilDriftY: 0.0006,
+    veils: [
+      { z: -1.8, y: 1.75, width: 8.8, height: 3.8, opacity: 0.032, rotationY: 0.0 },
+      { z: 1.8, y: 1.48, width: 11.2, height: 3.2, opacity: 0.022, rotationY: 0.12 },
+      { z: 4.6, y: 1.18, width: 14.2, height: 2.4, opacity: 0.018, rotationY: -0.09 },
+    ],
+
+    dustCount: 112,
+    dustRadius: 6.8,
+    dustYMin: 0.45,
+    dustYMax: 3.2,
+    dustZMin: -4.2,
+    dustZMax: 5.4,
+    dustSize: 0.038,
+    dustOpacity: 0.072,
+    dustDriftX: 0.018,
+    dustDriftY: 0.01,
+    dustDriftZ: 0.014,
+    dustFloatX: 0.035,
+    dustFloatY: 0.045,
+    dustFloatZ: 0.04,
+  },
+
   lightDirection: {
     centralLightIntensityMin: 1.88,
     centralLightIntensityMax: 2.58,
